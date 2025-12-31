@@ -1,0 +1,47 @@
+[package]
+name = "ofml-interpreter"
+version = "0.1.0"
+edition = "2021"
+description = "OFML/CLS interpreter for Office Furniture Modeling Language"
+license = "MIT"
+
+[dependencies]
+thiserror = "1.0"
+logos = "0.14"           # Fast lexer generator
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+zip = "2.1"              # ALB archive reading
+byteorder = "1.5"        # Binary parsing
+gltf = "1.4"             # GLTF export
+base64 = "0.22"          # GLTF data encoding
+image = { version = "0.24", default-features = false, features = ["png", "jpeg", "tga", "bmp"] }  # Texture loading
+svg = "0.17"             # SVG generation for 2D output
+
+# OAP Configurator TUI dependencies
+ratatui = { version = "0.29", optional = true }
+crossterm = { version = "0.28", optional = true }
+clap = { version = "4.5", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+rust_decimal = { version = "1.33", features = ["serde"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[features]
+default = ["tui"]
+tui = ["ratatui", "crossterm"]
+
+[dev-dependencies]
+pretty_assertions = "1.4"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+
+
+
+
+
+
+
+
+
+

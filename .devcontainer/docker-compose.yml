@@ -1,0 +1,27 @@
+name: ofml-interpreter
+
+services:
+  devcontainer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ofml-interpreter-dev
+    volumes:
+      # Workspace
+      - ..:/workspace:cached
+      # Reference data
+      - ${HOME}/Development/ofmldata:/reference/ofmldata
+      - ${HOME}/Development/ConceptOffice7:/reference/ConceptOffice7:ro
+      # Persist caches
+      - cargo-cache:/home/vscode/.cargo
+      - rustup-cache:/home/vscode/.rustup
+    # Keep container running
+    command: sleep infinity
+
+volumes:
+  cargo-cache:
+  rustup-cache:
+
+networks:
+  default:
+    name: ofml-interpreter-network
