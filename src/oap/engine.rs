@@ -205,13 +205,13 @@ impl ConfigurationEngine {
                     for art_nr in &family.article_nrs {
                         let prices = reader.get_prices(art_nr);
                         if !prices.is_empty() {
-                            return self.match_and_calculate_price(&prices, config, price_date);
+                            return self.match_and_calculate_price(&reader, &prices, config, price_date);
                         }
                     }
                     continue;
                 }
 
-                return self.match_and_calculate_price(&prices, config, price_date);
+                return self.match_and_calculate_price(&reader, &prices, config, price_date);
             }
         }
 
@@ -221,11 +221,12 @@ impl ConfigurationEngine {
     /// Match prices and calculate total
     fn match_and_calculate_price(
         &self,
+        reader: &OcdReader,
         prices: &[&OcdPrice],
         config: &FamilyConfiguration,
         price_date: chrono::NaiveDate,
     ) -> Option<PriceResult> {
-        let matched = match_prices_to_variant(prices, &config.variant_code)?;
+        let matched = match_prices_to_variant(reader, prices, &config.variant_code)?;
 
         let valid_from =
             chrono::NaiveDate::parse_from_str(&matched.base_price.date_from, "%Y%m%d")
@@ -453,7 +454,7 @@ impl ConfigurationEngine {
                 let variant_code = generate_variant_code(properties);
 
                 // Match prices against variant code
-                let matched = match_prices_to_variant(&prices, &variant_code);
+                let matched = match_prices_to_variant(&reader, &prices, &variant_code);
 
                 if let Some(price_result) = matched {
                     // Parse dates and create PriceResult
@@ -750,28 +751,61 @@ struct MatchedPrice<'a> {
     surcharges: Vec<Surcharge>,
 }
 
-/// Match prices to variant code
+/// Match prices to variant code using OCD 4.3 price_level field
+/// Uses propvalue2varcond table for direct lookup when available,
+/// otherwise falls back to pattern matching
 fn match_prices_to_variant<'a>(
+    reader: &OcdReader,
     prices: &'a [&'a OcdPrice],
     variant_code: &str,
 ) -> Option<MatchedPrice<'a>> {
-    // Known base price indicators (manufacturer-specific patterns)
+    // Known base price indicators (fallback for older data without price_level)
     let base_indicators = ["S_PGX", "BASE", "STANDARD", ""];
 
-    // Find base price: empty var_cond, or known base indicators
-    let base_price = prices
-        .iter()
-        .find(|p| base_indicators.iter().any(|ind| p.var_cond == *ind || p.var_cond.is_empty()))
-        .or_else(|| prices.first())?;
+    // Extract values from variant code for matching (case-insensitive)
+    let variant_values: std::collections::HashSet<String> = variant_code
+        .split(';')
+        .filter_map(|part| part.split('=').nth(1))
+        .map(|s| s.to_uppercase())
+        .collect();
 
-    let base_amount = Decimal::from_f32_retain(base_price.price).unwrap_or(Decimal::ZERO);
-
-    // Extract values from variant code for surcharge matching
-    // Also build a map of key=value pairs
-    let variant_values: std::collections::HashSet<&str> = variant_code
+    // Also keep original case values for backwards compatibility
+    let variant_values_original: std::collections::HashSet<&str> = variant_code
         .split(';')
         .filter_map(|part| part.split('=').nth(1))
         .collect();
+
+    // STEP 1: Find base price - first try to match one with matching var_cond
+    // This handles manufacturers like "fast" where each variant has its own base price
+    let base_price = prices
+        .iter()
+        .find(|p| {
+            p.price_level == "B" &&
+            !p.var_cond.is_empty() &&
+            variant_values.contains(&p.var_cond.to_uppercase())
+        })
+        .or_else(|| {
+            // Fallback: any base price with empty var_cond or base indicators
+            prices
+                .iter()
+                .find(|p| {
+                    p.price_level == "B" &&
+                    (p.var_cond.is_empty() || base_indicators.contains(&p.var_cond.as_str()))
+                })
+        })
+        .or_else(|| {
+            // Fallback: first base price
+            prices.iter().find(|p| p.price_level == "B")
+        })
+        .or_else(|| {
+            // Legacy fallback: empty var_cond or known base indicators
+            prices
+                .iter()
+                .find(|p| base_indicators.iter().any(|ind| p.var_cond == *ind || p.var_cond.is_empty()))
+        })
+        .or_else(|| prices.first())?;
+
+    let base_amount = Decimal::from_f32_retain(base_price.price).unwrap_or(Decimal::ZERO);
 
     // Build variant map for heuristic matching
     let variant_map: HashMap<&str, &str> = variant_code
@@ -782,26 +816,61 @@ fn match_prices_to_variant<'a>(
         })
         .collect();
 
-    // Find matching surcharges
+    // STEP 2: Find matching surcharges (price_level='X')
     let mut surcharges = Vec::new();
     let mut seen_var_conds = std::collections::HashSet::new();
 
+    // Build set of expected var_conds using propvalue2varcond direct lookup
+    let direct_var_conds: std::collections::HashSet<String> = if reader.has_varcond_mappings() {
+        // Use propvalue2varcond table for direct lookup (100% accurate)
+        let values: Vec<&str> = variant_values_original.iter().copied().collect();
+        reader.lookup_varconds_for_values(&values).into_iter().collect()
+    } else {
+        std::collections::HashSet::new()
+    };
+
+    // Build uppercase version of direct_var_conds for case-insensitive matching
+    let direct_var_conds_upper: std::collections::HashSet<String> = direct_var_conds
+        .iter()
+        .map(|s| s.to_uppercase())
+        .collect();
+
     for price in prices {
-        // Skip base price and already processed var_conds
-        if price.var_cond.is_empty()
-            || base_indicators.contains(&price.var_cond.as_str())
-            || seen_var_conds.contains(&price.var_cond)
-        {
+        // Only process surcharges (price_level='X') or prices with non-empty var_cond
+        let is_surcharge = price.price_level == "X" ||
+            (!price.var_cond.is_empty() && price.price_level != "B" && price.price_level != "D");
+
+        if !is_surcharge {
             continue;
         }
 
-        // Check if var_cond matches current variant using multiple strategies
-        if matches_var_cond_extended(&price.var_cond, variant_code, &variant_values, &variant_map) {
+        // Skip base price indicators and already processed
+        if base_indicators.contains(&price.var_cond.as_str()) && price.price_level != "X" {
+            continue;
+        }
+        if seen_var_conds.contains(&price.var_cond) {
+            continue;
+        }
+
+        // Check if var_cond matches using the best available method
+        let is_match = if reader.has_varcond_mappings() {
+            // Use direct lookup from propvalue2varcond table (preferred)
+            // Try both exact match and case-insensitive match
+            direct_var_conds.contains(&price.var_cond) ||
+            direct_var_conds_upper.contains(&price.var_cond.to_uppercase())
+        } else {
+            // Fallback to pattern matching for manufacturers without mapping table
+            matches_var_cond_extended(&price.var_cond, variant_code, &variant_values_original, &variant_map)
+        };
+
+        if is_match {
             let amount = Decimal::from_f32_retain(price.price).unwrap_or(Decimal::ZERO);
+            // Get human-readable description from ocd_pricetext, fallback to var_cond
+            let description = reader.get_price_description(price, "DE");
             surcharges.push(Surcharge {
-                name: price.var_cond.clone(),
+                name: description,
                 amount,
-                is_percentage: false,
+                is_percentage: !price.is_fix, // is_fix=1 means fixed amount, 0 means percentage
             });
             seen_var_conds.insert(price.var_cond.clone());
         }
@@ -816,12 +885,42 @@ fn match_prices_to_variant<'a>(
 
 /// Extended matching for OCD surcharge codes
 /// Supports multiple matching strategies for manufacturer-specific formats
+/// Language-agnostic: works with any descriptive var_cond (German, English, Spanish, etc.)
 fn matches_var_cond_extended(
     var_cond: &str,
     variant_code: &str,
     variant_values: &std::collections::HashSet<&str>,
     variant_map: &HashMap<&str, &str>,
 ) -> bool {
+    // Strategy 0: Direct case-insensitive match (language-agnostic descriptive names)
+    // Handles: "PP AXA BLACK", "CODIGO_BASE", "ESTRUCTURA_01", "STOFFGRUPPE_3", etc.
+    let var_cond_upper = var_cond.to_uppercase();
+    for value in variant_values {
+        if value.to_uppercase() == var_cond_upper {
+            return true;
+        }
+    }
+
+    // Strategy 0b: Price group pattern matching (PG11, PG90, GL1, MG1, etc.)
+    // These are common across manufacturers regardless of language
+    if var_cond.len() >= 2 && var_cond.len() <= 6 {
+        let prefix = &var_cond[..2].to_uppercase();
+        if prefix == "PG" || prefix == "GL" || prefix == "MG" {
+            // Check if any property value matches this price group
+            for value in variant_values {
+                if value.to_uppercase() == var_cond_upper {
+                    return true;
+                }
+            }
+            // Also check property values in the map
+            for value in variant_map.values() {
+                if value.to_uppercase() == var_cond_upper {
+                    return true;
+                }
+            }
+        }
+    }
+
     // Strategy 1: Direct formula matching (KEY=value, KEY>value, etc.)
     if matches_var_cond(var_cond, variant_code, variant_values) {
         return true;
@@ -846,7 +945,22 @@ fn matches_var_cond_extended(
             }
         }
 
-        // Pattern 3: Split code by underscore for compound codes (e.g., S_2415_F2)
+        // Pattern 3: Embedded numeric code matching for complex values
+        // e.g., code="166" matches "XST244166018" which contains "166"
+        // Only apply to short numeric codes (3-4 digits) to avoid false matches
+        if code.len() >= 3 && code.len() <= 4 && code.chars().all(|c| c.is_ascii_digit()) {
+            for value in variant_values {
+                // Check if value contains the code at a word/number boundary
+                // Look for patterns where the code is embedded in a larger string
+                if value.contains(code) && value.len() > code.len() {
+                    // Verify it's a meaningful match (not just random substring)
+                    // Accept if the value is alphanumeric and code is clearly embedded
+                    return true;
+                }
+            }
+        }
+
+        // Pattern 4: Split code by underscore for compound codes (e.g., S_2415_F2)
         // Check if first part matches property suffix and second matches value
         if let Some(pos) = code.find('_') {
             let (num_part, suffix) = code.split_at(pos);
@@ -865,7 +979,7 @@ fn matches_var_cond_extended(
             }
         }
 
-        // Pattern 4: Numeric code as property value
+        // Pattern 5: Numeric code as property value prefix/match
         // e.g., S_1801 matches if any property has value starting with "1801"
         if code.chars().all(|c| c.is_ascii_digit()) {
             for value in variant_values {

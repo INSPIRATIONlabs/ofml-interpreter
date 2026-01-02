@@ -5,6 +5,8 @@
 #[cfg(feature = "tui")]
 pub mod articles;
 #[cfg(feature = "tui")]
+pub mod catalog;
+#[cfg(feature = "tui")]
 pub mod families;
 #[cfg(feature = "tui")]
 pub mod family_config;
@@ -14,3 +16,5 @@ pub mod help;
 pub mod manufacturers;
 #[cfg(feature = "tui")]
 pub mod properties;
+#[cfg(feature = "tui")]
+pub mod tables;

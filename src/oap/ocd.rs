@@ -5,7 +5,9 @@
 //! - Articles (ocd_article table)
 //! - Article descriptions (ocd_artshorttext, ocd_artlongtext tables)
 //! - Prices (ocd_price table)
+//! - Price descriptions (ocd_pricetext table)
 //! - Property definitions (ocd_property, ocd_propertyvalue tables)
+//! - Property to variant condition mappings (propvalue2varcond table)
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -34,18 +36,26 @@ pub struct OcdArticle {
 pub struct OcdPrice {
     /// Article number
     pub article_nr: String,
-    /// Variant condition
+    /// Variant condition (e.g., "S_PGX", "S_166", "")
     pub var_cond: String,
-    /// Price type
+    /// Price type (e.g., "L" for list price)
     pub price_type: String,
-    /// Price value in cents or smallest currency unit
+    /// Price level: 'B' = base price, 'X' = surcharge, 'D' = discount
+    pub price_level: String,
+    /// Whether price is a fixed amount (true) or percentage (false)
+    pub is_fix: bool,
+    /// Text ID for price description (links to ocd_pricetext)
+    pub text_id: String,
+    /// Price value in currency units
     pub price: f32,
     /// Currency code (e.g., "EUR")
     pub currency: String,
-    /// Valid from date
+    /// Valid from date (YYYYMMDD)
     pub date_from: String,
-    /// Valid to date
+    /// Valid to date (YYYYMMDD)
     pub date_to: String,
+    /// Scale quantity for volume pricing
+    pub scale_qty: i32,
 }
 
 /// A text entry from the OCD catalog
@@ -61,6 +71,25 @@ pub struct OcdText {
     pub text: String,
 }
 
+/// A property value to variant condition mapping entry
+/// This table provides direct mapping between property values and var_cond codes
+/// used for price lookup, eliminating the need for pattern matching.
+#[derive(Debug, Clone)]
+pub struct PropValue2VarCond {
+    /// Property class (e.g., "ASY_83341201")
+    pub prop_class: String,
+    /// Property key (e.g., "ASYABELE090")
+    pub prop_key: String,
+    /// Property value (e.g., "1AS01")
+    pub prop_value: String,
+    /// Optional condition for when this mapping applies
+    pub condition: String,
+    /// The variant condition code for ocd_price lookup (e.g., "83341201_1AS01")
+    pub var_cond: String,
+    /// Additional text to append to price description
+    pub prop_text_add: String,
+}
+
 /// OCD catalog reader
 pub struct OcdReader {
     /// Loaded articles
@@ -71,8 +100,15 @@ pub struct OcdReader {
     pub short_texts: HashMap<String, Vec<OcdText>>,
     /// Long texts indexed by textnr
     pub long_texts: HashMap<String, Vec<OcdText>>,
+    /// Price texts indexed by textnr (from ocd_pricetext table)
+    pub price_texts: HashMap<String, Vec<OcdText>>,
     /// Property class mappings: article_nr -> list of property classes
     pub article_prop_classes: HashMap<String, Vec<String>>,
+    /// Property value to variant condition mappings (for direct price lookup)
+    /// Key: (prop_class, prop_value), Value: var_cond
+    pub propvalue2varcond: HashMap<(String, String), PropValue2VarCond>,
+    /// Quick lookup by prop_value only (for cases where prop_class is unknown)
+    pub propvalue2varcond_by_value: HashMap<String, Vec<PropValue2VarCond>>,
 }
 
 impl OcdReader {
@@ -84,14 +120,20 @@ impl OcdReader {
         let prices = Self::read_prices(&mut reader)?;
         let short_texts = Self::read_texts(&mut reader, "ocd_artshorttext")?;
         let long_texts = Self::read_texts(&mut reader, "ocd_artlongtext")?;
+        let price_texts = Self::read_texts(&mut reader, "ocd_pricetext")?;
         let article_prop_classes = Self::read_property_classes(&mut reader)?;
+        let (propvalue2varcond, propvalue2varcond_by_value) =
+            Self::read_propvalue2varcond(&mut reader)?;
 
         Ok(Self {
             articles,
             prices,
             short_texts,
             long_texts,
+            price_texts,
             article_prop_classes,
+            propvalue2varcond,
+            propvalue2varcond_by_value,
         })
     }
 
@@ -120,6 +162,101 @@ impl OcdReader {
         }
 
         Ok(mappings)
+    }
+
+    /// Read propvalue2varcond mapping table
+    /// This table provides direct mapping between property values and var_cond codes
+    /// Returns both a precise (prop_class, prop_value) -> mapping index and a value-only index
+    fn read_propvalue2varcond(
+        reader: &mut EBaseReader,
+    ) -> Result<
+        (
+            HashMap<(String, String), PropValue2VarCond>,
+            HashMap<String, Vec<PropValue2VarCond>>,
+        ),
+        String,
+    > {
+        if !reader.tables.contains_key("propvalue2varcond") {
+            return Ok((HashMap::new(), HashMap::new()));
+        }
+
+        let records = reader
+            .read_records("propvalue2varcond", None)
+            .map_err(|e| e.to_string())?;
+
+        let mut by_class_value: HashMap<(String, String), PropValue2VarCond> = HashMap::new();
+        let mut by_value: HashMap<String, Vec<PropValue2VarCond>> = HashMap::new();
+
+        for r in &records {
+            let mapping = PropValue2VarCond {
+                prop_class: get_string(r, "prop_class"),
+                prop_key: get_string(r, "prop_key"),
+                prop_value: get_string(r, "prop_value"),
+                condition: get_string(r, "condition"),
+                var_cond: get_string(r, "var_cond"),
+                prop_text_add: get_string(r, "prop_text_add"),
+            };
+
+            // Skip entries without var_cond
+            if mapping.var_cond.is_empty() {
+                continue;
+            }
+
+            // Index by (prop_class, prop_value) for precise lookup
+            let key = (mapping.prop_class.clone(), mapping.prop_value.clone());
+            by_class_value.insert(key, mapping.clone());
+
+            // Index by prop_value for fallback lookup
+            by_value
+                .entry(mapping.prop_value.clone())
+                .or_default()
+                .push(mapping);
+        }
+
+        Ok((by_class_value, by_value))
+    }
+
+    /// Check if this reader has propvalue2varcond mappings available
+    pub fn has_varcond_mappings(&self) -> bool {
+        !self.propvalue2varcond.is_empty()
+    }
+
+    /// Look up var_cond for a property value using propvalue2varcond table
+    /// Returns the var_cond code if found, None otherwise
+    pub fn lookup_varcond(&self, prop_class: &str, prop_value: &str) -> Option<&str> {
+        // Try precise lookup first
+        let key = (prop_class.to_string(), prop_value.to_string());
+        if let Some(mapping) = self.propvalue2varcond.get(&key) {
+            return Some(&mapping.var_cond);
+        }
+
+        // Fallback: lookup by value only (returns first match)
+        if let Some(mappings) = self.propvalue2varcond_by_value.get(prop_value) {
+            if let Some(mapping) = mappings.first() {
+                return Some(&mapping.var_cond);
+            }
+        }
+
+        None
+    }
+
+    /// Look up all var_cond codes for a set of property values
+    /// Returns a vector of var_cond codes that apply
+    pub fn lookup_varconds_for_values(&self, values: &[&str]) -> Vec<String> {
+        let mut var_conds = Vec::new();
+
+        for value in values {
+            // Try lookup by value only
+            if let Some(mappings) = self.propvalue2varcond_by_value.get(*value) {
+                for mapping in mappings {
+                    if !var_conds.contains(&mapping.var_cond) {
+                        var_conds.push(mapping.var_cond.clone());
+                    }
+                }
+            }
+        }
+
+        var_conds
     }
 
     /// Get property classes for an article
@@ -166,14 +303,33 @@ impl OcdReader {
 
         Ok(records
             .iter()
-            .map(|r| OcdPrice {
-                article_nr: get_string(r, "article_nr"),
-                var_cond: get_string(r, "var_cond"),
-                price_type: get_string(r, "price_type"),
-                price: get_float(r, "price"),
-                currency: get_string(r, "currency"),
-                date_from: get_string(r, "date_from"),
-                date_to: get_string(r, "date_to"),
+            .map(|r| {
+                // Column names from actual pdata.ebase files
+                let article_nr = get_string_any(r, &["article_nr", "ArticleID"]);
+                let var_cond = get_string_any(r, &["var_cond", "Variantcondition"]);
+                let price_type = get_string_any(r, &["price_type", "Type"]);
+                let price_level = get_string_any(r, &["price_level", "Level"]);
+                let is_fix_val = get_int_any(r, &["is_fix", "FixValue"]);
+                let text_id = get_string_any(r, &["price_textnr", "text_id", "TextID"]);
+                let price = get_float_any(r, &["price", "PriceValue"]);
+                let currency = get_string_any(r, &["currency", "Currency"]);
+                let date_from = get_string_any(r, &["date_from", "DateFrom"]);
+                let date_to = get_string_any(r, &["date_to", "DateTo"]);
+                let scale_qty = get_int_any(r, &["scale_quantity", "scale_qty", "ScaleQuantity"]);
+
+                OcdPrice {
+                    article_nr,
+                    var_cond,
+                    price_type,
+                    price_level,
+                    is_fix: is_fix_val == 1,
+                    text_id,
+                    price,
+                    currency,
+                    date_from,
+                    date_to,
+                    scale_qty,
+                }
             })
             .filter(|p| !p.article_nr.is_empty())
             .collect())
@@ -254,21 +410,101 @@ impl OcdReader {
         })
     }
 
-    /// Get the price for an article (base price, no variant)
-    pub fn get_base_price(&self, article_nr: &str) -> Option<&OcdPrice> {
-        // First try to find a price with empty var_cond (true base price)
-        let base = self.prices
-            .iter()
-            .find(|p| p.article_nr == article_nr && p.var_cond.is_empty());
-
-        if base.is_some() {
-            return base;
+    /// Get the price text description for a given text ID
+    /// Used to get human-readable descriptions for price entries (surcharges, discounts)
+    pub fn get_price_text(&self, text_id: &str, language: &str) -> Option<String> {
+        if text_id.is_empty() {
+            return None;
         }
 
-        // Fallback: return first price for the article (if all have var_cond)
+        self.price_texts.get(text_id).and_then(|texts| {
+            // First try exact language match
+            let matching: Vec<_> = texts
+                .iter()
+                .filter(|t| t.language == language)
+                .map(|t| t.text.clone())
+                .collect();
+
+            if !matching.is_empty() {
+                return Some(matching.join(" "));
+            }
+
+            // Fallback: try empty language (default)
+            let default: Vec<_> = texts
+                .iter()
+                .filter(|t| t.language.is_empty())
+                .map(|t| t.text.clone())
+                .collect();
+
+            if !default.is_empty() {
+                return Some(default.join(" "));
+            }
+
+            // Last resort: any language
+            texts.first().map(|t| t.text.clone())
+        })
+    }
+
+    /// Get price description, falling back to var_cond if no text found
+    pub fn get_price_description(&self, price: &OcdPrice, language: &str) -> String {
+        // First try text_id lookup
+        if let Some(text) = self.get_price_text(&price.text_id, language) {
+            return text;
+        }
+
+        // Try propvalue2varcond prop_text_add if available
+        if !price.var_cond.is_empty() {
+            // Look for a mapping that has this var_cond
+            for mapping in self.propvalue2varcond.values() {
+                if mapping.var_cond == price.var_cond && !mapping.prop_text_add.is_empty() {
+                    return mapping.prop_text_add.clone();
+                }
+            }
+        }
+
+        // Fallback to var_cond
+        if !price.var_cond.is_empty() {
+            price.var_cond.clone()
+        } else {
+            "Base price".to_string()
+        }
+    }
+
+    /// Get the base price for an article (price_level = 'B')
+    pub fn get_base_price(&self, article_nr: &str) -> Option<&OcdPrice> {
+        // Find base price using price_level field (OCD 4.3 spec)
+        // 'B' = Base price, 'X' = Surcharge, 'D' = Discount
         self.prices
             .iter()
-            .find(|p| p.article_nr == article_nr)
+            .find(|p| p.article_nr == article_nr && p.price_level == "B")
+            .or_else(|| {
+                // Fallback for older data: empty var_cond typically indicates base price
+                self.prices
+                    .iter()
+                    .find(|p| p.article_nr == article_nr && p.var_cond.is_empty())
+            })
+            .or_else(|| {
+                // Final fallback: return first price for the article
+                self.prices
+                    .iter()
+                    .find(|p| p.article_nr == article_nr)
+            })
+    }
+
+    /// Get all surcharges for an article (price_level = 'X')
+    pub fn get_surcharges(&self, article_nr: &str) -> Vec<&OcdPrice> {
+        self.prices
+            .iter()
+            .filter(|p| p.article_nr == article_nr && p.price_level == "X")
+            .collect()
+    }
+
+    /// Get all discounts for an article (price_level = 'D')
+    pub fn get_discounts(&self, article_nr: &str) -> Vec<&OcdPrice> {
+        self.prices
+            .iter()
+            .filter(|p| p.article_nr == article_nr && p.price_level == "D")
+            .collect()
     }
 
     /// Get all prices for an article
@@ -289,12 +525,49 @@ fn get_string(record: &HashMap<String, Value>, key: &str) -> String {
         .to_string()
 }
 
+/// Try multiple column names (for different naming conventions)
+fn get_string_any(record: &HashMap<String, Value>, keys: &[&str]) -> String {
+    for key in keys {
+        if let Some(v) = record.get(*key) {
+            if let Some(s) = v.as_str() {
+                return s.to_string();
+            }
+        }
+    }
+    String::new()
+}
+
+#[allow(dead_code)]
 fn get_float(record: &HashMap<String, Value>, key: &str) -> f32 {
     record.get(key).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32
 }
 
+/// Try multiple column names for float values
+fn get_float_any(record: &HashMap<String, Value>, keys: &[&str]) -> f32 {
+    for key in keys {
+        if let Some(v) = record.get(*key) {
+            if let Some(f) = v.as_f64() {
+                return f as f32;
+            }
+        }
+    }
+    0.0
+}
+
 fn get_uint(record: &HashMap<String, Value>, key: &str) -> u32 {
     record.get(key).and_then(|v| v.as_i64()).unwrap_or(0) as u32
+}
+
+/// Try multiple column names for integer values
+fn get_int_any(record: &HashMap<String, Value>, keys: &[&str]) -> i32 {
+    for key in keys {
+        if let Some(v) = record.get(*key) {
+            if let Some(i) = v.as_i64() {
+                return i as i32;
+            }
+        }
+    }
+    0
 }
 
 use std::sync::OnceLock;
@@ -420,6 +693,46 @@ pub fn load_articles_with_descriptions(
     // Remove duplicates
     let mut seen = std::collections::HashSet::new();
     result.retain(|(a, _)| seen.insert(a.article_nr.clone()));
+
+    result
+}
+
+/// Article with both short and long descriptions
+#[derive(Debug, Clone)]
+pub struct ArticleWithDescriptions {
+    pub article: OcdArticle,
+    pub short_description: String,
+    pub long_description: String,
+}
+
+/// Load articles with both short and long descriptions for a manufacturer
+pub fn load_articles_with_full_descriptions(
+    manufacturer_path: &Path,
+    language: &str,
+) -> Vec<ArticleWithDescriptions> {
+    let mut result = Vec::new();
+
+    for pdata_path in find_pdata_files(manufacturer_path) {
+        if let Some(reader) = get_ocd_reader(&pdata_path) {
+            for article in &reader.articles {
+                let short_description = reader
+                    .get_short_description(&article.short_textnr, language)
+                    .unwrap_or_else(|| article.article_nr.clone());
+                let long_description = reader
+                    .get_long_description(&article.long_textnr, language)
+                    .unwrap_or_default();
+                result.push(ArticleWithDescriptions {
+                    article: article.clone(),
+                    short_description,
+                    long_description,
+                });
+            }
+        }
+    }
+
+    // Remove duplicates
+    let mut seen = std::collections::HashSet::new();
+    result.retain(|a| seen.insert(a.article.article_nr.clone()));
 
     result
 }

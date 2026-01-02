@@ -11,6 +11,7 @@
 //! The module is designed to be reusable across CLI, TUI, and future WASM targets.
 
 pub mod actions;
+pub mod catalog;
 pub mod config;
 pub mod engine;
 pub mod families;

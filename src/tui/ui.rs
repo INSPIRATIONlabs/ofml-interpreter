@@ -14,7 +14,7 @@ use ratatui::{
 #[cfg(feature = "tui")]
 use super::app::{App, Screen};
 #[cfg(feature = "tui")]
-use super::views::{articles, families, family_config, help, manufacturers, properties};
+use super::views::{articles, catalog, families, family_config, help, manufacturers, properties, tables};
 
 /// Main render function that dispatches to the appropriate view
 #[cfg(feature = "tui")]
@@ -32,10 +32,13 @@ pub fn render(frame: &mut Frame, app: &App) {
 
     match app.screen {
         Screen::Manufacturers => manufacturers::render(frame, app, chunks[1]),
+        Screen::Catalog => catalog::render(frame, app, chunks[1]),
         Screen::Families => families::render(frame, app, chunks[1]),
         Screen::FamilyConfig => family_config::render(frame, app, chunks[1]),
         Screen::Articles => articles::render(frame, app, chunks[1]),
         Screen::Properties => properties::render(frame, app, chunks[1]),
+        Screen::Tables => tables::render_tables(frame, app, chunks[1]),
+        Screen::TableView => tables::render_table_view(frame, app, chunks[1]),
         Screen::Help => help::render(frame, app, chunks[1]),
     }
 
@@ -47,6 +50,13 @@ pub fn render(frame: &mut Frame, app: &App) {
 fn render_header(frame: &mut Frame, app: &App, area: Rect) {
     let title = match app.screen {
         Screen::Manufacturers => "OAP Konfigurator - Hersteller".to_string(),
+        Screen::Catalog => {
+            if let Some(ref m) = app.selected_manufacturer {
+                format!("OAP Konfigurator - {} - Katalog", m.name)
+            } else {
+                "OAP Konfigurator - Katalog".to_string()
+            }
+        }
         Screen::Families => {
             if let Some(ref m) = app.selected_manufacturer {
                 format!("OAP Konfigurator - {} - Produktfamilien", m.name)
@@ -75,6 +85,20 @@ fn render_header(frame: &mut Frame, app: &App, area: Rect) {
                 "OAP Konfigurator - Konfiguration".to_string()
             }
         }
+        Screen::Tables => {
+            if let Some(ref m) = app.selected_manufacturer {
+                format!("OAP Konfigurator - {} - Tabellen", m.name)
+            } else {
+                "OAP Konfigurator - Tabellen".to_string()
+            }
+        }
+        Screen::TableView => {
+            if let Some(ref t) = app.selected_table {
+                format!("OAP Konfigurator - Tabelle: {}", t.name)
+            } else {
+                "OAP Konfigurator - Tabelle".to_string()
+            }
+        }
         Screen::Help => "OAP Konfigurator - Hilfe".to_string(),
     };
 
@@ -95,7 +119,7 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
 
     // Keybindings
     let keybindings = match app.screen {
-        Screen::Manufacturers | Screen::Families | Screen::Articles => {
+        Screen::Manufacturers | Screen::Catalog | Screen::Families | Screen::Articles => {
             if app.search_active {
                 vec![
                     Span::raw("Esc: "),
@@ -142,6 +166,29 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
             Span::raw(" | "),
             Span::raw("e: "),
             Span::styled("Export", Style::default().fg(Color::Yellow)),
+            Span::raw(" | "),
+            Span::raw("Esc: "),
+            Span::styled("Zurück", Style::default().fg(Color::Yellow)),
+        ],
+        Screen::Tables => vec![
+            Span::raw("↑↓: "),
+            Span::styled("Navigation", Style::default().fg(Color::Yellow)),
+            Span::raw(" | "),
+            Span::raw("Enter: "),
+            Span::styled("Öffnen", Style::default().fg(Color::Yellow)),
+            Span::raw(" | "),
+            Span::raw("/: "),
+            Span::styled("Suchen", Style::default().fg(Color::Yellow)),
+            Span::raw(" | "),
+            Span::raw("Esc: "),
+            Span::styled("Zurück", Style::default().fg(Color::Yellow)),
+        ],
+        Screen::TableView => vec![
+            Span::raw("↑↓: "),
+            Span::styled("Zeile", Style::default().fg(Color::Yellow)),
+            Span::raw(" | "),
+            Span::raw("←→: "),
+            Span::styled("Spalten scrollen", Style::default().fg(Color::Yellow)),
             Span::raw(" | "),
             Span::raw("Esc: "),
             Span::styled("Zurück", Style::default().fg(Color::Yellow)),

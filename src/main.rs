@@ -10,6 +10,7 @@ use clap::{Parser, Subcommand};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 use ofml_interpreter::alb_loader::{load_manufacturer_with_deps, AlbLoader};
+use ofml_interpreter::oap::families::ProductFamily;
 use ofml_interpreter::geometry;
 use ofml_interpreter::operations::{
     self, export_to_glb, load_geometry_file, validate_geometry, ProductConfig,
@@ -92,6 +93,32 @@ enum Commands {
         /// Initial price date (YYYY-MM-DD)
         #[arg(short = 'd', long)]
         price_date: Option<String>,
+    },
+
+    /// Browse XCF catalog structure for a manufacturer
+    Catalog {
+        /// Path to OFML data directory
+        data_path: String,
+        /// Manufacturer ID (e.g., "bisley", "kn")
+        manufacturer: String,
+        /// Language code (default: de)
+        #[arg(short, long, default_value = "de")]
+        language: String,
+        /// Output as JSON
+        #[arg(short, long)]
+        json: bool,
+        /// Show full tree structure
+        #[arg(short, long)]
+        tree: bool,
+        /// Search for category/article by name
+        #[arg(short, long)]
+        search: Option<String>,
+        /// List all available catalogs
+        #[arg(long)]
+        list: bool,
+        /// Load a specific catalog by name (e.g., "desks_m_cat")
+        #[arg(short = 'c', long)]
+        catalog_name: Option<String>,
     },
 
     // =====================
@@ -291,6 +318,16 @@ fn main() {
             data_path,
             price_date,
         } => cmd_oap_tui(&data_path, price_date.as_deref()),
+        Commands::Catalog {
+            data_path,
+            manufacturer,
+            language,
+            json,
+            tree,
+            search,
+            list,
+            catalog_name,
+        } => cmd_oap_catalog(&data_path, &manufacturer, &language, json, tree, search.as_deref(), list, catalog_name.as_deref()),
 
         // Existing commands
         Commands::Parse { file_path } => {
@@ -785,6 +822,230 @@ fn cmd_oap_configure(
     Ok(())
 }
 
+fn cmd_oap_catalog(
+    data_path: &str,
+    manufacturer: &str,
+    language: &str,
+    json_output: bool,
+    show_tree: bool,
+    search: Option<&str>,
+    list_catalogs: bool,
+    catalog_name: Option<&str>,
+) -> CmdResult {
+    use ofml_interpreter::oap::catalog::{
+        find_manufacturer_catalogs, CatalogLoader, CatalogNode, NodeType,
+    };
+    use ofml_interpreter::oap::manufacturers;
+
+    let path = Path::new(data_path);
+    let mfr_path = path.join(manufacturer);
+
+    if !mfr_path.exists() {
+        return Err(format!("Manufacturer not found: {}", manufacturer));
+    }
+
+    // Initialize manufacturer names
+    manufacturers::init_from_data_path(path);
+    let mfr_name = manufacturers::get_display_name(manufacturer);
+
+    // Find all catalogs
+    let catalogs = find_manufacturer_catalogs(&mfr_path);
+
+    if catalogs.is_empty() {
+        // List available series as fallback
+        println!("No XCF catalog found for {} ({})", mfr_name, manufacturer);
+        println!();
+        println!("Available series directories:");
+        if let Ok(entries) = std::fs::read_dir(&mfr_path) {
+            let mut series: Vec<_> = entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().is_dir())
+                .filter_map(|e| e.file_name().to_str().map(|s| s.to_string()))
+                .filter(|s| !s.starts_with('.') && s != "catalog")
+                .collect();
+            series.sort();
+            for s in &series {
+                println!("  {}", s);
+            }
+        }
+        return Ok(());
+    }
+
+    // List catalogs mode
+    if list_catalogs {
+        if json_output {
+            let json_cats: Vec<_> = catalogs.iter().map(|c| {
+                serde_json::json!({
+                    "name": c.name,
+                    "is_master": c.is_master,
+                    "path": c.path.display().to_string()
+                })
+            }).collect();
+            println!("{}", serde_json::to_string_pretty(&json_cats).unwrap());
+        } else {
+            println!("Available catalogs for {} ({}):", mfr_name, manufacturer);
+            println!();
+            for cat in &catalogs {
+                let master_tag = if cat.is_master { " [MASTER]" } else { "" };
+                println!("  {}{}", cat.name, master_tag);
+                println!("    Path: {}", cat.path.display());
+            }
+            println!();
+            println!("Use --catalog-name to load a specific catalog");
+        }
+        return Ok(());
+    }
+
+    // Load specific or default catalog
+    let catalog = if let Some(name) = catalog_name {
+        // Find specific catalog by name
+        let cat_info = catalogs.iter()
+            .find(|c| c.name == name)
+            .ok_or_else(|| format!("Catalog '{}' not found. Use --list to see available catalogs.", name))?;
+        CatalogLoader::load(&cat_info.path, language)
+            .map_err(|e| format!("Failed to load catalog: {}", e))?
+    } else {
+        // Load first master catalog, or first available
+        let cat_info = catalogs.iter()
+            .find(|c| c.is_master)
+            .or_else(|| catalogs.first())
+            .ok_or_else(|| "No catalog available".to_string())?;
+        CatalogLoader::load(&cat_info.path, language)
+            .map_err(|e| format!("Failed to load catalog: {}", e))?
+    };
+
+    let stats = catalog.stats();
+
+    // Handle search
+    if let Some(query) = search {
+        let query_lower = query.to_lowercase();
+
+        fn search_tree(node: &CatalogNode, query: &str, path: &[String]) -> Vec<(Vec<String>, CatalogNode)> {
+            let mut results = Vec::new();
+            let current_path: Vec<String> = path.iter().cloned().chain(std::iter::once(node.name.clone())).collect();
+
+            if node.name.to_lowercase().contains(query) || node.id.to_lowercase().contains(query) {
+                results.push((current_path.clone(), node.clone()));
+            }
+
+            for child in &node.children {
+                results.extend(search_tree(child, query, &current_path));
+            }
+            results
+        }
+
+        let results = search_tree(&catalog.root, &query_lower, &[]);
+
+        if json_output {
+            let json_results: Vec<_> = results.iter().map(|(path, node)| {
+                serde_json::json!({
+                    "path": path.join(" > "),
+                    "id": node.id,
+                    "name": node.name,
+                    "type": match node.node_type {
+                        NodeType::Folder => "folder",
+                        NodeType::Article => "article",
+                        NodeType::Root => "root",
+                    }
+                })
+            }).collect();
+            println!("{}", serde_json::to_string_pretty(&json_results).unwrap());
+        } else {
+            println!("Search results for '{}' in {} ({}):", query, mfr_name, manufacturer);
+            println!();
+            for (path, node) in &results {
+                let type_icon = match node.node_type {
+                    NodeType::Folder => "📁",
+                    NodeType::Article => "📄",
+                    NodeType::Root => "🏠",
+                };
+                println!("{} {} ({})", type_icon, path.join(" > "), node.id);
+            }
+            println!();
+            println!("Found {} results", results.len());
+        }
+        return Ok(());
+    }
+
+    // Output
+    if json_output {
+        fn node_to_json(node: &CatalogNode) -> serde_json::Value {
+            serde_json::json!({
+                "id": node.id,
+                "name": node.name,
+                "type": match node.node_type {
+                    NodeType::Folder => "folder",
+                    NodeType::Article => "article",
+                    NodeType::Root => "root",
+                },
+                "children": node.children.iter().map(node_to_json).collect::<Vec<_>>()
+            })
+        }
+
+        let output = serde_json::json!({
+            "manufacturer": manufacturer,
+            "manufacturer_name": mfr_name,
+            "language": language,
+            "stats": {
+                "total_nodes": stats.total_nodes,
+                "folders": stats.folder_count,
+                "articles": stats.article_count,
+                "languages": stats.languages,
+            },
+            "catalog": node_to_json(&catalog.root)
+        });
+        println!("{}", serde_json::to_string_pretty(&output).unwrap());
+    } else {
+        println!("XCF Catalog: {} ({})", mfr_name, manufacturer);
+        println!("Language: {}", language);
+        println!("Source: {}", catalog.source_path.display());
+        println!();
+        println!("Statistics:");
+        println!("  Categories: {}", stats.folder_count);
+        println!("  Articles: {}", stats.article_count);
+        println!("  Languages: {}", stats.languages.join(", "));
+        println!();
+
+        if show_tree {
+            fn print_tree(node: &CatalogNode, indent: usize, max_depth: usize) {
+                if indent > max_depth {
+                    return;
+                }
+                let prefix = "  ".repeat(indent);
+                let icon = match node.node_type {
+                    NodeType::Folder => "📁",
+                    NodeType::Article => "📄",
+                    NodeType::Root => "🏠",
+                };
+
+                if node.node_type != NodeType::Root {
+                    println!("{}{} {}", prefix, icon, node.name);
+                }
+
+                for child in &node.children {
+                    print_tree(child, indent + 1, max_depth);
+                }
+            }
+
+            println!("Catalog Structure:");
+            print_tree(&catalog.root, 0, 10);
+        } else {
+            // Show top-level categories only
+            println!("Top-level Categories:");
+            for child in &catalog.root.children {
+                let child_count = child.children.len();
+                let article_count = child.article_count();
+                println!("  📁 {} ({} sub-categories, {} articles)",
+                    child.name, child_count, article_count);
+            }
+            println!();
+            println!("Use --tree to see full structure, --search to find items");
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(feature = "tui")]
 fn cmd_oap_tui(data_path: &str, price_date_str: Option<&str>) -> CmdResult {
     use crossterm::{
@@ -866,6 +1127,7 @@ fn run_tui_loop(
     engine: &mut ofml_interpreter::oap::engine::ConfigurationEngine,
 ) -> CmdResult {
     use crossterm::event::{self, Event, KeyCode};
+    use ofml_interpreter::oap::catalog::load_smart_catalog;
     use ofml_interpreter::oap::families::FamilyConfiguration;
     use ofml_interpreter::oap::ocd;
     use ofml_interpreter::tui::{ui::render, Message, Screen};
@@ -881,41 +1143,229 @@ fn run_tui_loop(
                 KeyCode::Char('?') if !app.search_active => Some(Message::ShowHelp),
                 KeyCode::Char('/') if !app.search_active => Some(Message::ToggleSearch),
                 KeyCode::Char('e') if !app.search_active => Some(Message::Export),
+                KeyCode::Char('t') if !app.search_active && app.selected_manufacturer.is_some() => {
+                    // Load tables for current manufacturer
+                    if let Some(ref mfr) = app.selected_manufacturer {
+                        app.status_message = Some("Lade Tabellen...".to_string());
+                        let _ = terminal.draw(|f| render(f, app));
+                        app.tables = load_manufacturer_tables(&mfr.path);
+                        app.table_list_state.select(Some(0));
+                        app.status_message = Some(format!("{} Tabellen geladen", app.tables.len()));
+                    }
+                    Some(Message::ShowTables)
+                }
                 KeyCode::Up => Some(Message::NavigateUp),
                 KeyCode::Down => Some(Message::NavigateDown),
                 KeyCode::Left if app.screen == Screen::FamilyConfig => Some(Message::CyclePropertyOption(-1)),
                 KeyCode::Right if app.screen == Screen::FamilyConfig => Some(Message::CyclePropertyOption(1)),
+                KeyCode::Left if app.screen == Screen::TableView => Some(Message::ScrollTableHorizontal(-1)),
+                KeyCode::Right if app.screen == Screen::TableView => Some(Message::ScrollTableHorizontal(1)),
                 KeyCode::Enter => {
                     if let Some(idx) = app.get_selected_index() {
                         match app.screen {
                             Screen::Manufacturers => {
-                                // Load product families for the selected manufacturer
+                                // Load catalog and product families for the selected manufacturer
                                 if idx < app.manufacturers.len() {
-                                    let manufacturer = &app.manufacturers[idx];
+                                    // Clone manufacturer data to avoid borrow issues
+                                    let manufacturer_id = app.manufacturers[idx].id.clone();
+                                    let manufacturer_name = app.manufacturers[idx].name.clone();
+                                    let manufacturer_path = app.manufacturers[idx].path.clone();
 
-                                    app.status_message = Some(format!("Lade {}...", manufacturer.name));
+                                    app.status_message = Some(format!("Lade {}...", manufacturer_name));
                                     let _ = terminal.draw(|f| render(f, app));
 
+                                    // Try to load XCF catalog (master or aggregated from series)
+                                    let data_path = Path::new(&app.data_path);
+                                    let catalog = load_smart_catalog(
+                                        data_path,
+                                        &manufacturer_path,
+                                        &manufacturer_id,
+                                        "de"
+                                    );
+                                    let has_catalog = catalog.is_some();
+                                    app.set_catalog(catalog);
+
                                     // Load product families using ConfigurationEngine
-                                    let families = engine.load_families(&manufacturer.id);
+                                    let families = engine.load_families(&manufacturer_id);
 
                                     let configurable_count = families.iter()
                                         .filter(|f| f.is_configurable)
                                         .count();
                                     let with_props_count = families.iter()
-                                        .filter(|f| f.prop_class.is_some())
+                                        .filter(|f| !f.prop_classes.is_empty())
                                         .count();
 
                                     app.families = families.to_vec();
 
-                                    app.status_message = Some(format!(
-                                        "{} Produktfamilien ({} konfigurierbar, {} mit Eigenschaften)",
-                                        app.families.len(),
-                                        configurable_count,
-                                        with_props_count
-                                    ));
+                                    // Set status message
+                                    if has_catalog {
+                                        let cat_stats = app.catalog.as_ref()
+                                            .map(|c| c.stats())
+                                            .unwrap_or_else(|| ofml_interpreter::oap::catalog::CatalogStats {
+                                                total_nodes: 0,
+                                                folder_count: 0,
+                                                article_count: 0,
+                                                text_entries: 0,
+                                                languages: vec![],
+                                            });
+                                        app.status_message = Some(format!(
+                                            "Katalog: {} Kategorien, {} Artikel",
+                                            cat_stats.folder_count,
+                                            cat_stats.article_count
+                                        ));
+                                        // Navigate to catalog view
+                                        app.screen = Screen::Catalog;
+                                    } else {
+                                        app.status_message = Some(format!(
+                                            "{} Produktfamilien ({} konfigurierbar, {} mit Eigenschaften)",
+                                            app.families.len(),
+                                            configurable_count,
+                                            with_props_count
+                                        ));
+                                        // Navigate to families view
+                                        app.screen = Screen::Families;
+                                    }
                                 }
                                 Some(Message::SelectManufacturer(idx))
+                            }
+                            Screen::Catalog => {
+                                // Handle catalog selection
+                                if idx < app.catalog_children.len() {
+                                    let node = app.catalog_children[idx].clone();
+                                    match node.node_type {
+                                        ofml_interpreter::oap::catalog::NodeType::Folder => {
+                                            app.enter_catalog_folder(&node);
+                                            app.status_message = Some(format!(
+                                                "{} - {} Einträge",
+                                                node.name,
+                                                node.children.len()
+                                            ));
+                                        }
+                                        ofml_interpreter::oap::catalog::NodeType::Article => {
+                                            // Find family matching this article and configure it
+                                            // Use case-insensitive matching and try multiple strategies
+                                            let node_id_upper = node.id.to_uppercase();
+                                            let matching_family = app.families.iter()
+                                                .find(|f| f.article_nrs.iter().any(|nr| {
+                                                    let nr_upper = nr.to_uppercase();
+                                                    // Exact match (case-insensitive)
+                                                    nr_upper == node_id_upper ||
+                                                    // Family article contains catalog node id
+                                                    nr_upper.contains(&node_id_upper) ||
+                                                    // Catalog node id contains family article
+                                                    node_id_upper.contains(&nr_upper)
+                                                }));
+
+                                            if let Some(family) = matching_family {
+                                                if let Some(ref manufacturer) = app.selected_manufacturer {
+                                                    // Load properties for this family
+                                                    let properties = engine.get_family_properties(&manufacturer.id, &family.id);
+                                                    app.family_properties = properties.clone();
+                                                    app.selected_family = Some(family.clone());
+
+                                                    // Create configuration
+                                                    let mut config = FamilyConfiguration::new(&family.id, &properties);
+
+                                                    // Apply variant settings if node has a variant code
+                                                    if let Some(ref variant_code) = node.variant_code {
+                                                        if let Some(ref catalog) = app.catalog {
+                                                            if let Some(variant_def) = catalog.get_variant(&node.id, variant_code) {
+                                                                // Parse and apply property settings
+                                                                // Format: "PROPERTYCLASS.PROPERTY=VALUE"
+                                                                for setting in &variant_def.property_settings {
+                                                                    if let Some(eq_pos) = setting.rfind('=') {
+                                                                        let prop_path = &setting[..eq_pos];
+                                                                        let value = &setting[eq_pos + 1..];
+                                                                        // Extract property name (after last dot)
+                                                                        if let Some(dot_pos) = prop_path.rfind('.') {
+                                                                            let prop_key = &prop_path[dot_pos + 1..];
+                                                                            config.set(prop_key, value);
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+
+                                                    app.family_config = Some(config.clone());
+
+                                                    // Calculate price
+                                                    app.family_price = engine.calculate_family_price(
+                                                        &manufacturer.id,
+                                                        family,
+                                                        &config,
+                                                        app.price_date,
+                                                    );
+
+                                                    app.screen = Screen::FamilyConfig;
+                                                    let price_str = app.family_price.as_ref()
+                                                        .map(|p| format!("{:.2} {}", p.base_price, p.currency))
+                                                        .unwrap_or_else(|| "Preis n/a".to_string());
+                                                    app.status_message = Some(format!(
+                                                        "{} - {}",
+                                                        family.name, price_str
+                                                    ));
+                                                }
+                                            } else {
+                                                // No matching family found - try to create a minimal family from the catalog node
+                                                // This allows viewing articles that aren't in the family list
+                                                if let Some(ref manufacturer) = app.selected_manufacturer {
+                                                    // Get series from catalog node or path
+                                                    let series = node.series_ref.clone()
+                                                        .or_else(|| {
+                                                            // Try to extract series from breadcrumb
+                                                            app.catalog_path.first().map(|s| s.id.to_lowercase())
+                                                        })
+                                                        .unwrap_or_else(|| node.id.clone());
+
+                                                    // Create a minimal family for this article
+                                                    let minimal_family = ProductFamily {
+                                                        id: node.id.clone(),
+                                                        name: node.name.clone(),
+                                                        description: node.name.clone(),
+                                                        long_description: String::new(),
+                                                        series: series.clone(),
+                                                        base_article_nr: node.id.clone(),
+                                                        prop_classes: vec![],
+                                                        variant_count: 1,
+                                                        is_configurable: false,
+                                                        article_nrs: vec![node.id.clone()],
+                                                        article_descriptions: vec![node.name.clone()],
+                                                        article_long_descriptions: vec![],
+                                                    };
+
+                                                    // Try to load properties using the series
+                                                    let properties = engine.get_family_properties(&manufacturer.id, &series);
+                                                    app.family_properties = properties.clone();
+                                                    app.selected_family = Some(minimal_family.clone());
+
+                                                    // Create configuration
+                                                    let config = FamilyConfiguration::new(&minimal_family.id, &properties);
+                                                    app.family_config = Some(config.clone());
+
+                                                    // Calculate price
+                                                    app.family_price = engine.calculate_family_price(
+                                                        &manufacturer.id,
+                                                        &minimal_family,
+                                                        &config,
+                                                        app.price_date,
+                                                    );
+
+                                                    app.screen = Screen::FamilyConfig;
+                                                    let price_str = app.family_price.as_ref()
+                                                        .map(|p| format!("{:.2} {}", p.base_price, p.currency))
+                                                        .unwrap_or_else(|| "Preis n/a".to_string());
+                                                    app.status_message = Some(format!(
+                                                        "{} - {}",
+                                                        node.name, price_str
+                                                    ));
+                                                }
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                Some(Message::SelectCatalogNode(idx))
                             }
                             Screen::Families => {
                                 // Load properties for the selected product family
@@ -1081,6 +1531,21 @@ fn run_tui_loop(
                                 }
                                 Some(Message::SelectArticle(idx))
                             }
+                            Screen::Tables => {
+                                // Load table contents for selected table
+                                if idx < app.tables.len() {
+                                    let table_info = app.tables[idx].clone();
+                                    app.status_message = Some(format!("Lade Tabelle {}...", table_info.name));
+                                    let _ = terminal.draw(|f| render(f, app));
+
+                                    // Load table rows
+                                    app.table_rows = load_table_rows(&table_info.source_path, &table_info.name);
+                                    app.table_row_list_state.select(Some(0));
+                                    app.table_scroll_x = 0;
+                                    app.status_message = Some(format!("{} Zeilen geladen", app.table_rows.len()));
+                                }
+                                Some(Message::SelectTable(idx))
+                            }
                             _ => None,
                         }
                     } else {
@@ -1132,6 +1597,126 @@ fn run_tui_loop(
     }
 
     Ok(())
+}
+
+/// Load all tables from pdata.ebase files for a manufacturer
+#[cfg(feature = "tui")]
+fn load_manufacturer_tables(manufacturer_path: &std::path::Path) -> Vec<ofml_interpreter::tui::app::TableInfo> {
+    use ofml_interpreter::ebase::EBaseReader;
+    use ofml_interpreter::tui::app::TableInfo;
+
+    let mut all_tables: std::collections::HashMap<String, TableInfo> = std::collections::HashMap::new();
+
+    // Standard OCD tables to identify
+    let standard_tables: std::collections::HashSet<&str> = [
+        "ocd_article", "ocd_articletext", "ocd_artshorttext", "ocd_artlongtext",
+        "ocd_price", "ocd_pricetext", "ocd_property", "ocd_propertyclass",
+        "ocd_propertyvalue", "ocd_propertyvaluetext", "ocd_propvaluetext",
+        "ocd_variantcondition", "ocd_relation", "ocd_relationobj",
+        "ocd_propertygroup", "ocd_article2propgroup", "ocd_composite", "ocd_billofitems",
+        "propvalue2varcond",
+    ].into_iter().collect();
+
+    // Find all pdata.ebase files
+    fn find_ebase_files(path: &std::path::Path, files: &mut Vec<std::path::PathBuf>) {
+        if let Ok(entries) = std::fs::read_dir(path) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.is_dir() {
+                    find_ebase_files(&p, files);
+                } else if p.file_name().map_or(false, |n| n == "pdata.ebase") {
+                    files.push(p);
+                }
+            }
+        }
+    }
+
+    let mut ebase_files = Vec::new();
+    find_ebase_files(manufacturer_path, &mut ebase_files);
+
+    for ebase_path in ebase_files {
+        if let Ok(reader) = EBaseReader::open(&ebase_path) {
+            for table_name in reader.table_names() {
+                // Skip if we already have this table from a previous file
+                if all_tables.contains_key(table_name) {
+                    continue;
+                }
+
+                let is_standard = standard_tables.contains(table_name);
+                let row_count = reader.get_table(table_name).map(|t| t.record_count as usize).unwrap_or(0);
+                let columns: Vec<String> = reader.get_table(table_name)
+                    .map(|t| t.columns.iter().map(|c| c.name.clone()).collect())
+                    .unwrap_or_default();
+
+                all_tables.insert(table_name.to_string(), TableInfo {
+                    name: table_name.to_string(),
+                    row_count,
+                    columns,
+                    is_standard,
+                    source_path: ebase_path.to_string_lossy().to_string(),
+                });
+            }
+        }
+    }
+
+    // Sort: custom tables first, then standard tables
+    let mut result: Vec<TableInfo> = all_tables.into_values().collect();
+    result.sort_by(|a, b| {
+        match (a.is_standard, b.is_standard) {
+            (false, true) => std::cmp::Ordering::Less,
+            (true, false) => std::cmp::Ordering::Greater,
+            _ => a.name.cmp(&b.name),
+        }
+    });
+
+    result
+}
+
+/// Load rows from a specific table
+#[cfg(feature = "tui")]
+fn load_table_rows(ebase_path: &str, table_name: &str) -> Vec<ofml_interpreter::tui::app::TableRow> {
+    use ofml_interpreter::ebase::EBaseReader;
+    use ofml_interpreter::tui::app::TableRow;
+
+    let mut rows = Vec::new();
+    let path = std::path::Path::new(ebase_path);
+
+    if let Ok(mut reader) = EBaseReader::open(path) {
+        // Get column order from table definition first
+        let columns: Vec<String> = reader.get_table(table_name)
+            .map(|t| t.columns.iter().map(|c| c.name.clone()).collect())
+            .unwrap_or_default();
+
+        // Read records with limit
+        if let Ok(records) = reader.read_records(table_name, Some(500)) {
+            for record in records.iter() {
+                let values: Vec<String> = columns.iter()
+                    .map(|col| {
+                        record.get(col.as_str())
+                            .map(|v| value_to_string(v))
+                            .unwrap_or_default()
+                    })
+                    .collect();
+                rows.push(TableRow { values });
+            }
+        }
+    }
+
+    rows
+}
+
+/// Convert an EBase Value to a string
+#[cfg(feature = "tui")]
+fn value_to_string(v: &ofml_interpreter::ebase::Value) -> String {
+    use ofml_interpreter::ebase::Value;
+    match v {
+        Value::Int(i) => i.to_string(),
+        Value::UInt(u) => u.to_string(),
+        Value::Float(f) => format!("{:.4}", f),
+        Value::String(s) => s.clone(),
+        Value::Blob(id) => format!("[blob:{}]", id),
+        Value::Null => String::new(),
+    }
 }
 
 // ============================================================================

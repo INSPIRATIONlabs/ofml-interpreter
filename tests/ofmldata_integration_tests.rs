@@ -9,7 +9,7 @@ use ofml_interpreter::operations::{self, ProductConfig};
 use std::path::{Path, PathBuf};
 
 /// Base path to OFML data directory
-const OFMLDATA_BASE: &str = "/workspace/ofmldata";
+const OFMLDATA_BASE: &str = "/reference/ofmldata";
 
 /// Get path to a manufacturer's product directory
 fn product_path(manufacturer: &str, product: &str) -> PathBuf {
@@ -713,5 +713,407 @@ fn test_check_concerns_table() {
         let concern = record.get("concern").and_then(|v| v.as_str()).unwrap_or("");
         let concern_name = record.get("concern-name").and_then(|v| v.as_str()).unwrap_or("");
         println!("concern='{}', concern-name='{}'", concern, concern_name);
+    }
+}
+
+// ============================================================================
+// OCD Price Table Tests
+// ============================================================================
+
+#[test]
+fn test_ocd_price_columns_sedus() {
+    let path = Path::new("/reference/ofmldata/sex/ai/DE/1/db/pdata.ebase");
+    if !path.exists() {
+        eprintln!("Skipping test: Sedus AI pdata.ebase not found at {:?}", path);
+        return;
+    }
+
+    let reader = EBaseReader::open(path).expect("Failed to open pdata.ebase");
+
+    println!("\n=== OCD Price Table Structure ===\n");
+
+    if let Some(table) = reader.tables.get("ocd_price") {
+        println!("ocd_price table: {} records", table.record_count);
+        println!("\nColumns:");
+        for col in &table.columns {
+            println!("  {} (type_id={})", col.name, col.type_id);
+        }
+    } else {
+        eprintln!("No ocd_price table found!");
+    }
+}
+
+#[test]
+fn test_ocd_price_reading_with_price_level() {
+    use ofml_interpreter::oap::ocd::OcdReader;
+
+    let path = Path::new("/reference/ofmldata/sex/ai/DE/1/db/pdata.ebase");
+    if !path.exists() {
+        eprintln!("Skipping test: Sedus AI pdata.ebase not found");
+        return;
+    }
+
+    let reader = OcdReader::from_ebase(path).expect("Failed to load OCD");
+
+    println!("\n=== OCD Price Reading Test ===\n");
+    println!("Total prices: {}", reader.prices.len());
+
+    // Count by price_level
+    let base_prices: Vec<_> = reader.prices.iter().filter(|p| p.price_level == "B").collect();
+    let surcharges: Vec<_> = reader.prices.iter().filter(|p| p.price_level == "X").collect();
+    let discounts: Vec<_> = reader.prices.iter().filter(|p| p.price_level == "D").collect();
+    let empty_level: Vec<_> = reader.prices.iter().filter(|p| p.price_level.is_empty()).collect();
+
+    println!("  Base prices (level='B'): {}", base_prices.len());
+    println!("  Surcharges (level='X'): {}", surcharges.len());
+    println!("  Discounts (level='D'): {}", discounts.len());
+    println!("  Empty level: {}", empty_level.len());
+
+    // Show some sample prices
+    println!("\n=== Sample Prices ===\n");
+
+    // Sample base price
+    if let Some(base) = base_prices.first() {
+        println!("Base price example:");
+        println!("  article_nr: {}", base.article_nr);
+        println!("  var_cond: '{}'", base.var_cond);
+        println!("  price_level: '{}'", base.price_level);
+        println!("  is_fix: {}", base.is_fix);
+        println!("  price: {:.2} {}", base.price, base.currency);
+    }
+
+    // Sample surcharge
+    if let Some(surcharge) = surcharges.first() {
+        println!("\nSurcharge example:");
+        println!("  article_nr: {}", surcharge.article_nr);
+        println!("  var_cond: '{}'", surcharge.var_cond);
+        println!("  price_level: '{}'", surcharge.price_level);
+        println!("  is_fix: {}", surcharge.is_fix);
+        println!("  price: {:.2} {}", surcharge.price, surcharge.currency);
+    }
+
+    // Test get_base_price
+    if !reader.articles.is_empty() {
+        let first_article = &reader.articles[0].article_nr;
+        println!("\n=== get_base_price test for {} ===\n", first_article);
+
+        if let Some(base) = reader.get_base_price(first_article) {
+            println!("Found base price:");
+            println!("  price_level: '{}'", base.price_level);
+            println!("  price: {:.2} {}", base.price, base.currency);
+        } else {
+            println!("No base price found");
+        }
+
+        // Test get_surcharges
+        let surcharges = reader.get_surcharges(first_article);
+        println!("\nSurcharges for {}: {}", first_article, surcharges.len());
+        for s in surcharges.iter().take(5) {
+            println!("  var_cond='{}' price={:.2} is_fix={}", s.var_cond, s.price, s.is_fix);
+        }
+    }
+}
+
+#[test]
+fn test_multi_manufacturer_price_reading() {
+    use ofml_interpreter::oap::ocd::OcdReader;
+
+    if !ofmldata_exists() {
+        eprintln!("Skipping: ofmldata not found");
+        return;
+    }
+
+    let manufacturers = ["sex", "vitra", "kn", "sbu", "haw", "aix"];
+
+    println!("\n=== Multi-Manufacturer Price Reading ===\n");
+
+    for mfr in &manufacturers {
+        // Find pdata.ebase files
+        let mfr_path = PathBuf::from(OFMLDATA_BASE).join(mfr);
+        if !mfr_path.exists() {
+            continue;
+        }
+
+        let pdata_files = find_pdata_files_recursive(&mfr_path);
+        if pdata_files.is_empty() {
+            continue;
+        }
+
+        // Read first pdata.ebase
+        let pdata_path = &pdata_files[0];
+        match OcdReader::from_ebase(pdata_path) {
+            Ok(reader) => {
+                let base_count = reader.prices.iter().filter(|p| p.price_level == "B").count();
+                let surcharge_count = reader.prices.iter().filter(|p| p.price_level == "X").count();
+                let empty_count = reader.prices.iter().filter(|p| p.price_level.is_empty()).count();
+
+                println!("{}: {} prices (B:{}, X:{}, empty:{})",
+                    mfr, reader.prices.len(), base_count, surcharge_count, empty_count);
+
+                // Show if price_level field is being used
+                if base_count > 0 || surcharge_count > 0 {
+                    println!("  ✓ price_level field is populated");
+                } else if empty_count > 0 {
+                    println!("  ⚠ price_level field is empty (using var_cond fallback)");
+                }
+            }
+            Err(e) => {
+                println!("{}: Error reading pdata - {}", mfr, e);
+            }
+        }
+    }
+}
+
+/// Find all pdata.ebase files recursively
+fn find_pdata_files_recursive(path: &Path) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let entry_path = entry.path();
+            if entry_path.is_dir() {
+                files.extend(find_pdata_files_recursive(&entry_path));
+            } else if entry_path.file_name().map_or(false, |n| n == "pdata.ebase") {
+                files.push(entry_path);
+            }
+        }
+    }
+    files
+}
+
+#[test]
+fn test_debug_variant_matching() {
+    use ofml_interpreter::oap::ocd::OcdReader;
+    use ofml_interpreter::oap::families::{FamilyLoader, FamilyConfiguration};
+
+    let path = Path::new("/reference/ofmldata/sex/ai/DE/1/db/pdata.ebase");
+    if !path.exists() {
+        eprintln!("Skipping: Sedus AI not found");
+        return;
+    }
+
+    let reader = OcdReader::from_ebase(path).expect("load");
+
+    // Get prices for AI-121
+    let prices = reader.get_prices("AI-121");
+
+    println!("\n=== AI-121 Prices ===");
+    println!("Total: {}", prices.len());
+
+    // Show base price
+    if let Some(base) = prices.iter().find(|p| p.price_level == "B") {
+        println!("\nBase price: {:.2} EUR (var_cond='{}')", base.price, base.var_cond);
+    }
+
+    // Show all unique var_cond patterns
+    println!("\nAll unique var_cond patterns:");
+    let mut var_conds: Vec<_> = prices.iter().map(|p| p.var_cond.as_str()).collect();
+    var_conds.sort();
+    var_conds.dedup();
+    for vc in &var_conds {
+        let price = prices.iter().find(|p| &p.var_cond == vc).unwrap();
+        println!("  '{}' -> {:.2} EUR (level='{}')", vc, price.price, price.price_level);
+    }
+
+    // Now check what the variant code looks like
+    let mfr_path = Path::new("/reference/ofmldata/sex");
+    let loader = FamilyLoader::load(mfr_path, "DE");
+
+    // Find AI family
+    for family in loader.get_families() {
+        if family.base_article_nr.starts_with("AI-") {
+            println!("\n=== Family: {} ===", family.name);
+            println!("Base article: {}", family.base_article_nr);
+
+            let properties = loader.get_properties_for_family(family);
+            println!("Properties: {}", properties.len());
+
+            for prop in &properties {
+                println!("  {} ({} options): default={:?}",
+                    prop.key, prop.options.len(), prop.default_value);
+                for opt in prop.options.iter().take(5) {
+                    println!("    - '{}' ({})", opt.value, opt.label);
+                }
+                if prop.options.len() > 5 {
+                    println!("    ... and {} more", prop.options.len() - 5);
+                }
+            }
+
+            let config = FamilyConfiguration::new(&family.id, &properties);
+            println!("\nGenerated variant_code: '{}'", config.variant_code);
+
+            // Show selections
+            println!("\nSelections:");
+            for (k, v) in &config.selections {
+                println!("  {}='{}'", k, v);
+            }
+
+            break;
+        }
+    }
+}
+
+#[test]
+fn test_sedus_price_mapping_tables() {
+    let path = Path::new("/reference/ofmldata/sex/ai/DE/1/db/pdata.ebase");
+    if !path.exists() {
+        eprintln!("Skipping: Sedus AI not found");
+        return;
+    }
+
+    let mut reader = EBaseReader::open(path).expect("load");
+
+    println!("\n=== All Tables in pdata.ebase ===\n");
+    for (table_name, table) in &reader.tables {
+        println!("{}: {} records", table_name, table.record_count);
+    }
+
+    // Look at ocd_relation table - contains the mapping logic
+    println!("\n=== ocd_relation Sample Records ===\n");
+    if let Ok(records) = reader.read_records("ocd_relation", None) {
+        // Find records referencing surcharge codes
+        let surcharge_codes = ["S_1801", "S_166", "S_1513", "S_PGX"];
+
+        for code in &surcharge_codes {
+            println!("Looking for rel_name containing '{}':", code);
+            for rec in records.iter().filter(|r| {
+                r.get("rel_name").and_then(|v| v.as_str()).map_or(false, |s| s.contains(code))
+            }).take(5) {
+                let rel_name = rec.get("rel_name").and_then(|v| v.as_str()).unwrap_or("");
+                let rel_blocknr = rec.get("rel_blocknr").and_then(|v| v.as_i64()).unwrap_or(0);
+                let rel_block = rec.get("rel_block").and_then(|v| v.as_str()).unwrap_or("");
+                println!("  rel_name='{}' blocknr={} block='{}'", rel_name, rel_blocknr, rel_block);
+            }
+            println!();
+        }
+
+        // Look at first few relations to understand structure
+        println!("First 10 ocd_relation records:");
+        for rec in records.iter().take(10) {
+            let rel_name = rec.get("rel_name").and_then(|v| v.as_str()).unwrap_or("");
+            let rel_blocknr = rec.get("rel_blocknr").and_then(|v| v.as_i64()).unwrap_or(0);
+            let rel_block = rec.get("rel_block").and_then(|v| v.as_str()).unwrap_or("");
+            println!("  rel_name='{}' blocknr={} block='{}'", rel_name, rel_blocknr, rel_block);
+        }
+    }
+
+    // Look at ocd_price - check the actual var_cond format
+    println!("\n=== ocd_price Surcharge Codes ===\n");
+    if let Ok(records) = reader.read_records("ocd_price", None) {
+        for rec in records.iter().filter(|r| {
+            r.get("price_level").and_then(|v| v.as_str()).map_or(false, |s| s == "X")
+        }).take(15) {
+            let article_nr = rec.get("article_nr").and_then(|v| v.as_str()).unwrap_or("");
+            let var_cond = rec.get("var_cond").and_then(|v| v.as_str()).unwrap_or("");
+            let price = rec.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            println!("  article='{}' var_cond='{}' price={:.2}", article_nr, var_cond, price);
+        }
+    }
+
+    // Check ocd_propertyvalue for rel_obj that might link to surcharges
+    println!("\n=== ocd_propertyvalue with rel_obj ===\n");
+    if let Ok(records) = reader.read_records("ocd_propertyvalue", None) {
+        // Show records with non-zero rel_obj
+        for rec in records.iter().filter(|r| {
+            r.get("rel_obj").and_then(|v| v.as_i64()).map_or(false, |i| i != 0)
+        }).take(20) {
+            let prop_class = rec.get("prop_class").and_then(|v| v.as_str()).unwrap_or("");
+            let property = rec.get("property").and_then(|v| v.as_str()).unwrap_or("");
+            let rel_obj = rec.get("rel_obj").and_then(|v| v.as_i64()).unwrap_or(0);
+            println!("  prop_class='{}' property='{}' rel_obj={}", prop_class, property, rel_obj);
+        }
+
+        // Also show fabric/color related properties
+        println!("\nS_STOFF property values:");
+        for rec in records.iter().filter(|r| {
+            r.get("property").and_then(|v| v.as_str()).map_or(false, |s| s.starts_with("S_STOFF") || s == "S_FUSSFARBE")
+        }).take(10) {
+            let prop_class = rec.get("prop_class").and_then(|v| v.as_str()).unwrap_or("");
+            let property = rec.get("property").and_then(|v| v.as_str()).unwrap_or("");
+            let rel_obj = rec.get("rel_obj").and_then(|v| v.as_i64()).unwrap_or(0);
+            let pos_pval = rec.get("pos_pval").and_then(|v| v.as_i64()).unwrap_or(0);
+            println!("  prop_class='{}' property='{}' pos={} rel_obj={}", prop_class, property, pos_pval, rel_obj);
+        }
+    }
+
+    // Look at ocd_relationobj with Domain='P' for pricing
+    println!("\n=== ocd_relationobj (pricing) ===\n");
+    if let Ok(records) = reader.read_records("ocd_relationobj", None) {
+        println!("First 10 relationobj records:");
+        for rec in records.iter().take(10) {
+            for (k, v) in rec {
+                print!("{}='{:?}' ", k, v);
+            }
+            println!();
+        }
+    }
+}
+
+#[test]
+fn test_sedus_article_base_prices() {
+    use ofml_interpreter::oap::ocd::OcdReader;
+
+    let path = Path::new("/reference/ofmldata/sex/ai/DE/1/db/pdata.ebase");
+    if !path.exists() {
+        eprintln!("Skipping: Sedus AI not found");
+        return;
+    }
+
+    let reader = OcdReader::from_ebase(path).expect("load");
+
+    println!("\n=== Base Prices for Different Articles ===\n");
+    
+    // Get all articles
+    let articles = &reader.articles;
+    println!("Total articles in OCD: {}", articles.len());
+    
+    for art in articles {
+        println!("\nArticle: {}", art.article_nr);
+        
+        // Get base price (level='B')
+        if let Some(base) = reader.get_base_price(&art.article_nr) {
+            println!("  Base price: {:.2} {} (level='{}', var_cond='{}')",
+                base.price, base.currency, base.price_level, base.var_cond);
+        } else {
+            println!("  No base price found");
+        }
+        
+        // Count surcharges
+        let surcharges = reader.get_surcharges(&art.article_nr);
+        println!("  Surcharges: {} entries", surcharges.len());
+        
+        // Show unique var_cond codes
+        let codes: std::collections::HashSet<_> = surcharges.iter()
+            .map(|s| s.var_cond.as_str())
+            .collect();
+        if !codes.is_empty() {
+            println!("  Surcharge codes: {:?}", codes);
+        }
+    }
+}
+
+#[test]
+fn test_sedus_price_rules() {
+    let path = Path::new("/reference/ofmldata/sex/ai/DE/1/db/pdata.ebase");
+    if !path.exists() {
+        eprintln!("Skipping: Sedus AI not found");
+        return;
+    }
+
+    let mut reader = EBaseReader::open(path).expect("load");
+
+    println!("\n=== ocd_price with price_rule ===\n");
+    if let Ok(records) = reader.read_records("ocd_price", None) {
+        for rec in records.iter().take(20) {
+            let article_nr = rec.get("article_nr").and_then(|v| v.as_str()).unwrap_or("");
+            let var_cond = rec.get("var_cond").and_then(|v| v.as_str()).unwrap_or("");
+            let price_rule = rec.get("price_rule").and_then(|v| v.as_str()).unwrap_or("");
+            let price_level = rec.get("price_level").and_then(|v| v.as_str()).unwrap_or("");
+            let price = rec.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            
+            if !price_rule.is_empty() || price_level == "X" {
+                println!("article='{}' var_cond='{}' level='{}' price={:.2} rule='{}'",
+                    article_nr, var_cond, price_level, price, price_rule);
+            }
+        }
     }
 }

@@ -1,5 +1,5 @@
 use std::path::Path;
-use ofml_interpreter::oap::ocd::{OcdReader, load_articles_with_descriptions};
+use ofml_interpreter::oap::ocd::OcdReader;
 
 #[test]
 fn test_abalon_descriptions() {

@@ -1,0 +1,27 @@
+---
+source: tests/unit/tui_snapshot_test.rs
+expression: buffer_str
+---
+OAP Konfigurator - Hilfe                                                        
+                                                                                
+────────────────────────────────────────────────────────────────────────────────
+┌ Hilfe ───────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  OAP Konfigurator - Tastaturkürzel                                           │
+│                                                                              │
+│  Navigation:                                                                 │
+│    ↑/↓       In Liste navigieren                                             │
+│    Enter     Auswählen / Öffnen                                              │
+│    Esc       Zurück / Schließen                                              │
+│    Tab       Nächste Eigenschaft                                             │
+│    Shift+Tab Vorherige Eigenschaft                                           │
+│                                                                              │
+│  Aktionen:                                                                   │
+│    /         Suche starten                                                   │
+│    d         Preisdatum setzen                                               │
+│    e         Konfiguration exportieren                                       │
+│    ?         Diese Hilfe anzeigen                                            │
+│    q         Programm beenden                                                │
+└──────────────────────────────────────────────────────────────────────────────┘
+────────────────────────────────────────────────────────────────────────────────
+Esc: Zurück

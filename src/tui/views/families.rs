@@ -89,7 +89,7 @@ fn render_family_item(family: &ProductFamily) -> ListItem<'static> {
     // Indicator: ⚙ = has OCD properties (configurable options)
     //            ● = has OAM mapping (CLS geometry) but no OCD properties
     //            ○ = simple article (no configuration)
-    let indicator = if family.prop_class.is_some() {
+    let indicator = if !family.prop_classes.is_empty() {
         Span::styled("⚙", Style::default().fg(Color::Cyan))
     } else if family.is_configurable {
         Span::styled("●", Style::default().fg(Color::Yellow))
