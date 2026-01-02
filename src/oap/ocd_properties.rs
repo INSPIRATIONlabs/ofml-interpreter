@@ -696,6 +696,178 @@ impl OcdPropertyReader {
         false
     }
 
+    /// Compute var_cond from property selections using TABLE relations
+    /// This handles manufacturers like FAST that use $VARCOND = PropertyName assignments
+    /// with cascading TABLE lookups to derive the var_cond dynamically.
+    ///
+    /// Returns the computed var_cond if successful, None if this manufacturer
+    /// doesn't use TABLE-based var_cond computation.
+    pub fn compute_varcond_from_selections(
+        &self,
+        prop_class: &str,
+        selections: &HashMap<String, String>,
+    ) -> Option<String> {
+        // Step 1: Find $VARCOND assignment in relations
+        // Look for patterns like: "$VARCOND = PropertyName" or "$VARCOND=PropertyName"
+        let mut varcond_property: Option<String> = None;
+
+        for relations in self.relations.values() {
+            for rel in relations {
+                let block = rel.rel_block.trim().to_uppercase();
+                if block.contains("$VARCOND") && block.contains('=') {
+                    // Parse $VARCOND = PropertyName
+                    // Handle both "$VARCOND = Artikelnummer" and "$VARCOND=Artikelnummer"
+                    let parts: Vec<&str> = block.split('=').collect();
+                    if parts.len() == 2 {
+                        let left = parts[0].trim();
+                        let right = parts[1].trim();
+                        if left.contains("$VARCOND") || left.contains("VARCOND") {
+                            // right is the property name that provides var_cond
+                            varcond_property = Some(right.to_string());
+                            break;
+                        }
+                    }
+                }
+            }
+            if varcond_property.is_some() {
+                break;
+            }
+        }
+
+        let varcond_prop = varcond_property?;
+
+        // Step 2: Compute the value of that property via TABLE lookups
+        // The property might be computed from other properties via cascading tables
+        self.compute_property_value(prop_class, &varcond_prop, selections)
+    }
+
+    /// Compute a property value via TABLE lookups
+    /// Handles cascading dependencies where one property depends on others
+    fn compute_property_value(
+        &self,
+        prop_class: &str,
+        property: &str,
+        selections: &HashMap<String, String>,
+    ) -> Option<String> {
+        // Check if this property value is directly provided in selections
+        if let Some(value) = selections.get(property) {
+            return Some(value.clone());
+        }
+        // Also check case-insensitive
+        let prop_lower = property.to_lowercase();
+        for (key, value) in selections {
+            if key.to_lowercase() == prop_lower {
+                return Some(value.clone());
+            }
+        }
+
+        // Find the property definition
+        let prop_key = (prop_class.to_string(), property.to_string());
+        let prop_def = self.properties.get(&prop_key).or_else(|| {
+            // Try case-insensitive search
+            self.properties.iter()
+                .find(|((pc, p), _)| pc == prop_class && p.to_uppercase() == property)
+                .map(|(_, def)| def)
+        })?;
+
+        // Get the relation object
+        if prop_def.rel_obj == 0 {
+            return None;
+        }
+        let rel_obj = self.relation_objs.get(&prop_def.rel_obj)?;
+
+        // Get relations
+        let relations = self.relations.get(&rel_obj.rel_name)?;
+
+        // Concatenate relation blocks
+        let rel_text: String = relations.iter()
+            .map(|r| r.rel_block.clone())
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        // Parse TABLE relation
+        let table_rel = Self::parse_table_relation(&rel_text)?;
+        let table_name = table_rel.table_name.to_lowercase() + "_tbl";
+
+        // Get the custom table data
+        let table_data = self.custom_tables.get(&table_name)?;
+
+        // Build filter conditions - first compute any dependent property values
+        let mut computed_selections = selections.clone();
+        for (_col, val) in &table_rel.column_mappings {
+            if !val.contains("$SELF") {
+                // This column references another property - recursively compute its value
+                if !computed_selections.contains_key(val) {
+                    let val_upper = val.to_uppercase();
+                    let found = computed_selections.iter().any(|(k, _)| k.to_uppercase() == val_upper);
+                    if !found {
+                        // Try to compute this dependent property
+                        if let Some(computed) = self.compute_property_value(prop_class, val, selections) {
+                            computed_selections.insert(val.clone(), computed);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Build filter conditions from computed selections
+        let mut filters: Vec<(String, String)> = Vec::new();
+        for (col, val) in &table_rel.column_mappings {
+            if !val.contains("$SELF") {
+                // Look for value in selections (case-insensitive)
+                let val_lower = val.to_lowercase();
+                let val_upper = val.to_uppercase();
+                for (sel_key, sel_val) in &computed_selections {
+                    if sel_key.to_lowercase() == val_lower || sel_key.to_uppercase() == val_upper {
+                        filters.push((col.to_lowercase(), sel_val.clone()));
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Find the target column (the one with $SELF reference)
+        let target_col = table_rel.target_column
+            .as_ref()
+            .map(|s| s.to_lowercase())
+            .unwrap_or_else(|| property.to_lowercase());
+
+        // Query the table
+        for row in table_data {
+            // Check if this row matches all filters
+            let matches = filters.is_empty() || filters.iter().all(|(col, expected)| {
+                row.get(col)
+                    .map(|v| v.eq_ignore_ascii_case(expected))
+                    .unwrap_or(false)
+            });
+
+            if matches {
+                // Get the value from target column
+                if let Some(value) = row.get(&target_col) {
+                    if !value.is_empty() {
+                        return Some(value.clone());
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Check if this manufacturer uses TABLE-based var_cond computation
+    /// Returns true if there's a $VARCOND assignment in any relation
+    pub fn uses_table_varcond(&self) -> bool {
+        for relations in self.relations.values() {
+            for rel in relations {
+                let block = rel.rel_block.trim().to_uppercase();
+                if block.contains("$VARCOND") && block.contains('=') {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
     /// Get all properties for a property class
     pub fn get_properties_for_class(&self, prop_class: &str) -> Vec<&OcdPropertyDef> {
         let mut props: Vec<_> = self

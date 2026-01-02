@@ -191,6 +191,18 @@ impl ConfigurationEngine {
     ) -> Option<PriceResult> {
         let mfr_path = self.data_path.join(manufacturer_id);
 
+        // Load property reader to compute var_cond from TABLE relations
+        let prop_reader = super::ocd_properties::load_manufacturer_properties(&mfr_path);
+
+        // Try to compute var_cond using TABLE relations (for manufacturers like FAST)
+        let computed_varcond = if prop_reader.uses_table_varcond() {
+            // Use first property class from the family
+            let prop_class = family.prop_classes.first().map(|s| s.as_str()).unwrap_or("");
+            prop_reader.compute_varcond_from_selections(prop_class, &config.selections)
+        } else {
+            None
+        };
+
         // Find pdata.ebase files (cached)
         let pdata_files = super::ocd::find_pdata_files(&mfr_path);
 
@@ -205,28 +217,46 @@ impl ConfigurationEngine {
                     for art_nr in &family.article_nrs {
                         let prices = reader.get_prices(art_nr);
                         if !prices.is_empty() {
-                            return self.match_and_calculate_price(&reader, &prices, config, price_date);
+                            return self.match_and_calculate_price_with_varcond(
+                                &reader,
+                                &prices,
+                                config,
+                                price_date,
+                                computed_varcond.as_deref(),
+                            );
                         }
                     }
                     continue;
                 }
 
-                return self.match_and_calculate_price(&reader, &prices, config, price_date);
+                return self.match_and_calculate_price_with_varcond(
+                    &reader,
+                    &prices,
+                    config,
+                    price_date,
+                    computed_varcond.as_deref(),
+                );
             }
         }
 
         None
     }
 
-    /// Match prices and calculate total
-    fn match_and_calculate_price(
+    /// Match prices and calculate total, with optional computed var_cond
+    fn match_and_calculate_price_with_varcond(
         &self,
         reader: &OcdReader,
         prices: &[&OcdPrice],
         config: &FamilyConfiguration,
         price_date: chrono::NaiveDate,
+        computed_varcond: Option<&str>,
     ) -> Option<PriceResult> {
-        let matched = match_prices_to_variant(reader, prices, &config.variant_code)?;
+        let matched = match_prices_to_variant_with_computed_varcond(
+            reader,
+            prices,
+            &config.variant_code,
+            computed_varcond,
+        )?;
 
         let valid_from =
             chrono::NaiveDate::parse_from_str(&matched.base_price.date_from, "%Y%m%d")
@@ -759,6 +789,16 @@ fn match_prices_to_variant<'a>(
     prices: &'a [&'a OcdPrice],
     variant_code: &str,
 ) -> Option<MatchedPrice<'a>> {
+    match_prices_to_variant_with_computed_varcond(reader, prices, variant_code, None)
+}
+
+/// Match prices to variant code, with optional computed var_cond for TABLE-based manufacturers
+fn match_prices_to_variant_with_computed_varcond<'a>(
+    reader: &OcdReader,
+    prices: &'a [&'a OcdPrice],
+    variant_code: &str,
+    computed_varcond: Option<&str>,
+) -> Option<MatchedPrice<'a>> {
     // Known base price indicators (fallback for older data without price_level)
     let base_indicators = ["S_PGX", "BASE", "STANDARD", ""];
 
@@ -775,35 +815,51 @@ fn match_prices_to_variant<'a>(
         .filter_map(|part| part.split('=').nth(1))
         .collect();
 
-    // STEP 1: Find base price - first try to match one with matching var_cond
-    // This handles manufacturers like "fast" where each variant has its own base price
-    let base_price = prices
-        .iter()
-        .find(|p| {
-            p.price_level == "B" &&
-            !p.var_cond.is_empty() &&
-            variant_values.contains(&p.var_cond.to_uppercase())
-        })
-        .or_else(|| {
-            // Fallback: any base price with empty var_cond or base indicators
-            prices
-                .iter()
-                .find(|p| {
-                    p.price_level == "B" &&
-                    (p.var_cond.is_empty() || base_indicators.contains(&p.var_cond.as_str()))
-                })
-        })
-        .or_else(|| {
-            // Fallback: first base price
-            prices.iter().find(|p| p.price_level == "B")
-        })
-        .or_else(|| {
-            // Legacy fallback: empty var_cond or known base indicators
-            prices
-                .iter()
-                .find(|p| base_indicators.iter().any(|ind| p.var_cond == *ind || p.var_cond.is_empty()))
-        })
-        .or_else(|| prices.first())?;
+    // STEP 1: Find base price
+    // First try computed var_cond (from TABLE relations) if provided
+    let base_price = if let Some(computed) = computed_varcond {
+        // Use the computed var_cond to find the matching base price
+        prices
+            .iter()
+            .find(|p| {
+                p.price_level == "B" &&
+                !p.var_cond.is_empty() &&
+                p.var_cond.eq_ignore_ascii_case(computed)
+            })
+    } else {
+        None
+    }
+    .or_else(|| {
+        // Try to match one with matching var_cond from variant values
+        // This handles manufacturers like "fast" where each variant has its own base price
+        prices
+            .iter()
+            .find(|p| {
+                p.price_level == "B" &&
+                !p.var_cond.is_empty() &&
+                variant_values.contains(&p.var_cond.to_uppercase())
+            })
+    })
+    .or_else(|| {
+        // Fallback: any base price with empty var_cond or base indicators
+        prices
+            .iter()
+            .find(|p| {
+                p.price_level == "B" &&
+                (p.var_cond.is_empty() || base_indicators.contains(&p.var_cond.as_str()))
+            })
+    })
+    .or_else(|| {
+        // Fallback: first base price
+        prices.iter().find(|p| p.price_level == "B")
+    })
+    .or_else(|| {
+        // Legacy fallback: empty var_cond or known base indicators
+        prices
+            .iter()
+            .find(|p| base_indicators.iter().any(|ind| p.var_cond == *ind || p.var_cond.is_empty()))
+    })
+    .or_else(|| prices.first())?;
 
     let base_amount = Decimal::from_f32_retain(base_price.price).unwrap_or(Decimal::ZERO);
 

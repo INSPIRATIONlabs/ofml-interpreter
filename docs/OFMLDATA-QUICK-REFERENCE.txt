@@ -1,0 +1,187 @@
+================================================================================
+OFML DATA QUICK REFERENCE
+================================================================================
+
+DIRECTORY STRUCTURE
+-------------------
+/reference/ofmldata/{mfr}/{series}/{lang}/{ver}/
+                                   ├─ db/pdata.ebase    (OCD pricing)
+                                   ├─ oam/oam.ebase     (mappings)
+                                   ├─ cat/xcf.zip       (catalog)
+                                   ├─ image/image.zip   (images)
+                                   ├─ etc/*.pdf         (docs)
+                                   └─ meta/mt.ebase     (metadata)
+
+/reference/ofmldata/{mfr}/{series}/{ver}/
+                                   ├─ odb.ebase         (3D objects)
+                                   ├─ ofml.ebase        (OFML meta)
+                                   └─ {mfr}_{series}_{ver}.alb  (geometry)
+
+/reference/ofmldata/{mfr}/global/{ver}/
+                                   └─ global.ebase      (shared data)
+
+KEY FILE TYPES
+--------------
+pdata.ebase     PRIMARY DATA - OCD pricing & properties (1-200 MB)
+odb.ebase       3D/2D object definitions (20-500 KB)
+ofml.ebase      OFML metadata (2-10 KB)
+oam.ebase       Article-to-model mapping (2-20 KB)
+*.alb           ZIP archive with OBJ/DWG/EGMS files (1-600 MB)
+global.ebase    Shared manufacturer data (100 KB - 2 MB)
+
+STATISTICS
+----------
+Manufacturers:  117+
+Series:         2,000+
+EBase Files:    14,235
+ALB Archives:   2,706
+Total Files:    180,000+
+Languages:      DE (primary), EN, IT, ANY
+
+EBASE TABLES (pdata.ebase)
+--------------------------
+Standard OCD 4.3 Tables:
+  ocd_article         2-2000 records      Articles (products)
+  ocd_price          60-10000+ records    Pricing (base + surcharges)
+  ocd_pricetext      60-1000 records      Price descriptions
+  ocd_propertyclass   4-500 records       Property groups
+  ocd_property       26-500 records       Property definitions
+  ocd_propertyvalue  100-10000+ records   Property values/options
+  ocd_propertytext   400-2000 records     Property labels
+  ocd_propvaluetext  1000-50000+ records  Value labels
+  ocd_relation       100-50000 records    Relationships
+  ocd_relationobj    100-10000 records    Relation instances
+
+ODB Tables (odb.ebase):
+  odb3d              10-500 records       3D object definitions
+  odb2d               0-50 records        2D drawings
+  layer               0-50 records        Layers
+  funcs               0-100 records       CLS functions
+
+OAM Tables (oam.ebase):
+  oam_article2ofml    1-100 records       Article→OFML mapping
+  oam_property2mat    0-500 records       Property→material mapping
+
+RECORD SIZES
+------------
+ocd_article:        40 bytes (11 fields)
+ocd_price:          64 bytes (13 fields) [Sedus] or 56 bytes [Knoll]
+ocd_propertyvalue:  52 bytes (14 fields)
+ocd_pricetext:      24 bytes [Sedus] or 20 bytes [Knoll]
+odb3d:             124 bytes (13 fields) - INLINE STRINGS!
+oam_article2ofml:   24 bytes (4 fields)
+
+DATA TYPES
+----------
+string_ref          4-byte reference to string table
+string(N)           N-byte inline string (space-padded)
+uint8               1-byte unsigned integer
+uint16              2-byte unsigned integer
+uint32              4-byte unsigned integer
+float64             8-byte double
+
+EXAMPLE MANUFACTURERS
+---------------------
+sex (Sedus)         48 series    Standard OCD structure
+kn (Knoll)          97+ series   Custom tables, version 2
+vitra (Vitra)       52 series    Extended tables, composites
+sbu (Steelcase)    178+ series   Largest collection
+
+TEST SERIES
+-----------
+SIMPLE:     sex/ai         Standard structure, 2 articles
+EXTENDED:   vitra/meda     Composites, bill of materials
+CUSTOM:     kn/conline     Version 2, custom material tables
+LARGE:      sbu/*          Complex properties, many series
+
+COMMON QUERIES
+--------------
+Get Articles:
+  SELECT article_nr, manufacturer, series FROM ocd_article
+
+Get Base Price:
+  SELECT price FROM ocd_price
+  WHERE article_nr = ? AND price_level = 'B'
+    AND var_cond IN ('S_PGX', 'BASE', 'STANDARD', '')
+
+Get Property Values:
+  SELECT pv.value_from, pvt.text FROM ocd_propertyvalue pv
+  JOIN ocd_propvaluetext pvt ON pv.pval_textnr = pvt.textnr
+  WHERE pv.prop_class = ? AND pv.property = ?
+
+PRICING MODEL
+-------------
+Base Price:
+  - price_level = 'B'
+  - var_cond IN ['S_PGX', 'BASE', 'STANDARD', '']
+
+Surcharges:
+  - price_level = 'X'
+  - var_cond = 'S_166' matches property value:
+    * Direct: value = "166"
+    * Suffix: value = "ABC166"
+    * Prefix: value = "166XYZ"
+
+Total Price = Base + Sum(matching surcharges)
+
+FILE LOCATIONS
+--------------
+OCD Pricing:    {mfr}/{series}/{lang}/{ver}/db/pdata.ebase
+3D Objects:     {mfr}/{series}/{ver}/odb.ebase
+Geometry:       {mfr}/{series}/{ver}/{mfr}_{series}_{ver}.alb
+Mappings:       {mfr}/{series}/{lang}/{ver}/oam/oam.ebase
+Shared Data:    {mfr}/global/{ver}/global.ebase
+
+COMMANDS
+--------
+List manufacturers:
+  ls -d /reference/ofmldata/*/
+
+Examine EBase:
+  cargo run -- ebase /reference/ofmldata/sex/ai/DE/1/db/pdata.ebase
+
+List ALB:
+  cargo run -- alb /reference/ofmldata/sex/ai/1/sex_ai_1.alb
+
+Extract geometry:
+  cargo run -- alb /path/to/file.alb "*.obj" ./output/
+
+SCHEMA VARIATIONS
+-----------------
+Sedus:  24-byte text records (with line_fmt field)
+Knoll:  20-byte text records (no line_fmt field)
+Vitra:  Standard + additional tables (composite, billofitems)
+
+Custom tables: {prefix}_{name}_tbl
+  - s_mod_var_stuhl_tbl (Sedus chair modifiers)
+  - vb_elektro_ex_matn_tbl (Knoll electrical materials)
+  - farben_conline_tbl (Knoll colors)
+
+DOCUMENTATION FILES
+-------------------
+1. OFMLDATA-INVESTIGATION-README.md    - Start here
+2. OFMLDATA-STRUCTURE-ANALYSIS.md      - Directory structure
+3. OFMLDATA-EXAMPLES.md                - Real-world examples
+4. OFML-TABLE-SCHEMAS.md               - Table definitions
+5. OFML-LIBRARY-REQUIREMENTS.md        - API design
+6. OFML-EXPLAINED.md                   - Concepts
+
+IMPLEMENTATION PHASES
+---------------------
+Phase 1: EBase parser, directory scanner
+Phase 2: OCD data structures, article/price loading
+Phase 3: ODB parsing, ALB extraction
+Phase 4: Relations, custom tables, caching
+
+GOTCHAS
+-------
+- odb3d uses INLINE strings, not string_ref!
+- Text table sizes vary: 20 vs 24 bytes
+- Some series missing expected files
+- Custom tables unpredictable
+- Version numbers inconsistent
+- Not all manufacturers use same structure
+
+================================================================================
+Generated: 2024-12-31 | Source: /reference/ofmldata/ analysis
+================================================================================

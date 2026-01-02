@@ -191,3 +191,198 @@ fn test_fast_wkm_tui_display() {
         }
     }
 }
+
+#[test]
+fn test_fast_wkm_price_dump() {
+    use ofml_interpreter::ebase::EBaseReader;
+
+    let path = Path::new("/reference/ofmldata/fast/wkm/DE/1/db/pdata.ebase");
+    if !path.exists() {
+        println!("FAST WKM data not available, skipping test");
+        return;
+    }
+
+    let mut reader = EBaseReader::open(path).expect("Should open FAST WKM ebase");
+
+    println!("\n=== FAST WKM ocd_price records ===");
+    if let Ok(prices) = reader.read_records("ocd_price", Some(30)) {
+        for p in &prices {
+            let article = p.get("article_nr").and_then(|v| v.as_str()).unwrap_or("");
+            let var_cond = p.get("var_cond").and_then(|v| v.as_str()).unwrap_or("");
+            let level = p.get("price_level").and_then(|v| v.as_str()).unwrap_or("");
+            let price = p.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let currency = p.get("currency").and_then(|v| v.as_str()).unwrap_or("");
+            println!("  {} | {:30} | {} | {:8.2} {}", article, var_cond, level, price, currency);
+        }
+    }
+}
+
+#[test]
+fn test_fast_wkm_compute_varcond() {
+    // Clear cache to ensure we get fresh data
+    clear_property_cache();
+
+    let path = Path::new("/reference/ofmldata/fast");
+    if !path.exists() {
+        println!("FAST manufacturer data not available, skipping test");
+        return;
+    }
+
+    let reader = load_manufacturer_properties(path);
+
+    // Check if FAST uses TABLE-based var_cond
+    assert!(reader.uses_table_varcond(), "FAST should use TABLE-based var_cond");
+
+    println!("\n=== Testing var_cond computation for FAST WKM ===\n");
+
+    // Debug: Show wkt_groesse_tbl content
+    println!("WKT_Groesse table content:");
+    if let Some(table) = reader.custom_tables.get("wkt_groesse_tbl") {
+        println!("  Table has {} rows", table.len());
+        for (i, row) in table.iter().take(5).enumerate() {
+            println!("  Row {}: {:?}", i, row);
+        }
+        // Show entries with 140X40
+        println!("\n  Entries containing 140X40:");
+        for row in table {
+            if let Some(abm) = row.get("abmessung") {
+                if abm.to_uppercase().contains("140") {
+                    println!("    {:?}", row);
+                }
+            }
+        }
+    } else {
+        println!("  TABLE NOT FOUND!");
+    }
+
+    // Test case 1: 100X60 with VOLLHOLZ_SCHWARZ should compute to SG-MB-WKM-100X60-HOSW
+    let mut selections1: HashMap<String, String> = HashMap::new();
+    selections1.insert("Abmessung".to_string(), "100X60".to_string());
+    selections1.insert("Farbe_Rahmen".to_string(), "VOLLHOLZ_SCHWARZ".to_string());
+
+    let varcond1 = reader.compute_varcond_from_selections("Rahmen", &selections1);
+    println!("\nSelections: {:?}", selections1);
+    println!("Computed var_cond: {:?}", varcond1);
+
+    // Should match SG-MB-WKM-100X60-HOSW (case-insensitive)
+    assert!(varcond1.is_some(), "Should compute var_cond for 100X60 + VOLLHOLZ_SCHWARZ");
+    let vc1 = varcond1.unwrap();
+    assert!(
+        vc1.to_uppercase().contains("100X60") && vc1.to_uppercase().contains("HOSW"),
+        "Expected var_cond containing 100X60 and HOSW, got: {}",
+        vc1
+    );
+
+    // Test case 2: 100X60 with VOLLHOLZ_EICHE should compute to SG-MB-WKM-100X60-HOEI
+    let mut selections2: HashMap<String, String> = HashMap::new();
+    selections2.insert("Abmessung".to_string(), "100X60".to_string());
+    selections2.insert("Farbe_Rahmen".to_string(), "VOLLHOLZ_EICHE".to_string());
+
+    let varcond2 = reader.compute_varcond_from_selections("Rahmen", &selections2);
+    println!("\nSelections: {:?}", selections2);
+    println!("Computed var_cond: {:?}", varcond2);
+
+    // Should match SG-MB-WKM-100X60-HOEI (case-insensitive)
+    assert!(varcond2.is_some(), "Should compute var_cond for 100X60 + VOLLHOLZ_EICHE");
+    let vc2 = varcond2.unwrap();
+    assert!(
+        vc2.to_uppercase().contains("100X60") && vc2.to_uppercase().contains("HOEI"),
+        "Expected var_cond containing 100X60 and HOEI, got: {}",
+        vc2
+    );
+
+    println!("\n=== Basic var_cond computations passed! ===\n");
+}
+
+#[test]
+fn test_fast_wkm_price_with_varcond() {
+    use ofml_interpreter::oap::engine::ConfigurationEngine;
+    use ofml_interpreter::oap::families::{FamilyConfiguration, FamilyLoader};
+
+    // Clear cache to ensure we get fresh data
+    clear_property_cache();
+
+    let path = Path::new("/reference/ofmldata");
+    if !path.exists() {
+        println!("OFML data not available, skipping test");
+        return;
+    }
+
+    let mfr_path = Path::new("/reference/ofmldata/fast");
+    if !mfr_path.exists() {
+        println!("FAST manufacturer data not available, skipping test");
+        return;
+    }
+
+    // Load families for FAST
+    let loader = FamilyLoader::load(mfr_path, "DE");
+
+    // Find WKM family
+    let wkm_family = loader.get_families().iter().find(|f| f.series.to_uppercase() == "WKM");
+    if wkm_family.is_none() {
+        println!("WKM family not found, skipping test");
+        return;
+    }
+    let wkm_family = wkm_family.unwrap();
+    println!("Found WKM family: {} - {}", wkm_family.id, wkm_family.name);
+    println!("Base article: {}", wkm_family.base_article_nr);
+    println!("Property classes: {:?}", wkm_family.prop_classes);
+
+    // Get properties for the family
+    let props = loader.get_properties_for_family(wkm_family);
+    println!("\nProperties available: {}", props.len());
+    for prop in &props {
+        println!("  {} ({}) - {} options", prop.key, prop.label, prop.options.len());
+    }
+
+    // Create configuration
+    let mut config = FamilyConfiguration::new(&wkm_family.id, &props);
+
+    // Set specific values: 100X60 with VOLLHOLZ_SCHWARZ
+    config.set("Abmessung", "100X60");
+    config.set("Farbe_Rahmen", "VOLLHOLZ_SCHWARZ");
+
+    println!("\n=== Price calculation test ===");
+    println!("Configuration: {:?}", config.selections);
+    println!("Variant code: {}", config.variant_code);
+
+    // Calculate price
+    let engine = ConfigurationEngine::new(path);
+    let today = chrono::Local::now().date_naive();
+    let price_result = engine.calculate_family_price("fast", wkm_family, &config, today);
+
+    println!("\nPrice result: {:?}", price_result);
+
+    if let Some(price) = price_result {
+        println!("\n  Base price: {} {}", price.base_price, price.currency);
+        println!("  Total: {} {}", price.total_price, price.currency);
+        // VOLLHOLZ_SCHWARZ (100X60) should be around 368.91 EUR
+        assert!(
+            price.base_price > rust_decimal::Decimal::from(300)
+                && price.base_price < rust_decimal::Decimal::from(500),
+            "Price should be in reasonable range for 100X60 VOLLHOLZ_SCHWARZ"
+        );
+    } else {
+        println!("\nNo price found - checking if prices exist in data...");
+        // This is not necessarily a failure - the article might not have prices
+    }
+
+    // Test with VOLLHOLZ_EICHE (should have higher price)
+    config.set("Farbe_Rahmen", "VOLLHOLZ_EICHE");
+    println!("\n=== Testing with VOLLHOLZ_EICHE (Oak - premium) ===");
+    println!("Configuration: {:?}", config.selections);
+
+    let price_oak = engine.calculate_family_price("fast", wkm_family, &config, today);
+    println!("Price result for oak: {:?}", price_oak);
+
+    if let Some(price) = price_oak {
+        println!("\n  Base price (oak): {} {}", price.base_price, price.currency);
+        // Oak (VOLLHOLZ_EICHE) should be around 394.12 EUR (higher than black)
+        assert!(
+            price.base_price > rust_decimal::Decimal::from(350),
+            "Oak price should be higher than 350 EUR"
+        );
+    }
+
+    println!("\n=== FAST WKM price test complete! ===\n");
+}
