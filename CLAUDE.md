@@ -79,6 +79,11 @@ let base_indicators = ["S_PGX", "BASE", "STANDARD", ""];
 - Use `thiserror` for error handling
 - Use `serde` for serialization
 
+## Development Rules
+
+- **No silent TODOs or workarounds**: Do not add `// TODO` comments or incomplete implementations without asking. Either implement the feature fully or ask if it should be implemented. Never silently defer work.
+- **Complete implementations**: When implementing a feature, ensure all parts are connected and working. For example, if adding price calculation, ensure it's triggered when relevant (e.g., on property change).
+
 ## Dependencies
 
 Key crates:

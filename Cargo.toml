@@ -24,6 +24,7 @@ clap = { version = "4.5", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 rust_decimal = { version = "1.33", features = ["serde"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
+encoding_rs = "0.8"  # Character encoding for XCF catalog files
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
@@ -34,6 +35,7 @@ tui = ["ratatui", "crossterm"]
 [dev-dependencies]
 pretty_assertions = "1.4"
 criterion = { version = "0.5", features = ["html_reports"] }
+insta = "1.40"
 
 
 
