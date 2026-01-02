@@ -508,11 +508,21 @@ impl OcdReader {
     }
 
     /// Get all prices for an article
+    /// Also includes wildcard prices (article_nr = "*") which apply to all articles
     pub fn get_prices(&self, article_nr: &str) -> Vec<&OcdPrice> {
         self.prices
             .iter()
-            .filter(|p| p.article_nr == article_nr)
+            .filter(|p| p.article_nr == article_nr || p.article_nr == "*")
             .collect()
+    }
+
+    /// Check if this manufacturer has only surcharge pricing (no base prices)
+    /// This is used by manufacturers like Framery that use a surcharge-only model
+    pub fn has_surcharge_only_pricing(&self) -> bool {
+        // Check if there are no base prices but there are surcharges
+        let has_base = self.prices.iter().any(|p| p.price_level == "B");
+        let has_surcharges = self.prices.iter().any(|p| p.price_level == "X");
+        !has_base && has_surcharges
     }
 }
 

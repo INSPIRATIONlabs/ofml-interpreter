@@ -386,3 +386,286 @@ fn test_fast_wkm_price_with_varcond() {
 
     println!("\n=== FAST WKM price test complete! ===\n");
 }
+
+#[test]
+fn test_framery_price_debug() {
+    use ofml_interpreter::ebase::EBaseReader;
+    use ofml_interpreter::oap::ocd::OcdReader;
+
+    let path = std::path::Path::new("/reference/ofmldata/framery/frmr_one/ANY/1/db/pdata.ebase");
+    if !path.exists() {
+        println!("Framery data not available, skipping test");
+        return;
+    }
+
+    // Check raw ebase prices
+    let mut reader = EBaseReader::open(path).expect("Should open Framery ebase");
+
+    println!("\n=== Framery ocd_price raw records ===");
+    if let Ok(prices) = reader.read_records("ocd_price", Some(20)) {
+        println!("Found {} price records", prices.len());
+        for p in &prices {
+            let article = p.get("article_nr").map(|v| format!("{:?}", v)).unwrap_or_default();
+            let var_cond = p.get("var_cond").map(|v| format!("{:?}", v)).unwrap_or_default();
+            let level = p.get("price_level").map(|v| format!("{:?}", v)).unwrap_or_default();
+            let price = p.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            println!("  {} | {} | {} | {:.2}", article, var_cond, level, price);
+        }
+    }
+
+    // Check OcdReader
+    let ocd = OcdReader::from_ebase(path).expect("Should load OcdReader");
+    println!("\n=== OcdReader prices ===");
+    println!("Total prices: {}", ocd.prices.len());
+
+    // Try to get prices for various articles
+    for article in &["ONE", "ONE_PREMIUM", "*", ""] {
+        let prices = ocd.get_prices(article);
+        println!("Prices for '{}': {}", article, prices.len());
+    }
+
+    // Show all unique article_nrs
+    let mut articles: Vec<_> = ocd.prices.iter().map(|p| p.article_nr.as_str()).collect();
+    articles.sort();
+    articles.dedup();
+    println!("\nUnique article_nrs in prices: {:?}", articles);
+
+    // Show all price_levels
+    let mut levels: Vec<_> = ocd.prices.iter().map(|p| p.price_level.as_str()).collect();
+    levels.sort();
+    levels.dedup();
+    println!("Unique price_levels: {:?}", levels);
+
+    // Check surcharge-only detection
+    println!("\nSurcharge-only pricing: {}", ocd.has_surcharge_only_pricing());
+}
+
+#[test]
+fn test_framery_price_calculation() {
+    use ofml_interpreter::oap::engine::ConfigurationEngine;
+    use ofml_interpreter::oap::families::{FamilyConfiguration, FamilyLoader};
+
+    // Clear cache to ensure we get fresh data
+    clear_property_cache();
+
+    let path = Path::new("/reference/ofmldata");
+    if !path.exists() {
+        println!("OFML data not available, skipping test");
+        return;
+    }
+
+    let mfr_path = Path::new("/reference/ofmldata/framery");
+    if !mfr_path.exists() {
+        println!("Framery manufacturer data not available, skipping test");
+        return;
+    }
+
+    // Load families for Framery
+    let loader = FamilyLoader::load(mfr_path, "DE");
+    let families = loader.get_families();
+    println!("\n=== Framery families ===");
+    println!("Found {} families", families.len());
+
+    // Find a family
+    if let Some(family) = families.first() {
+        println!("Testing family: {} - {}", family.id, family.name);
+        println!("Base article: {}", family.base_article_nr);
+        println!("Property classes: {:?}", family.prop_classes);
+
+        // Get properties
+        let props = loader.get_properties_for_family(family);
+        println!("Properties: {}", props.len());
+        for prop in props.iter().take(5) {
+            println!("  {} ({}) - {} options", prop.key, prop.label, prop.options.len());
+        }
+
+        // Create configuration
+        let config = FamilyConfiguration::new(&family.id, &props);
+        println!("\nConfiguration selections: {:?}", config.selections);
+
+        // Calculate price
+        let engine = ConfigurationEngine::new(path);
+        let today = chrono::Local::now().date_naive();
+        let price_result = engine.calculate_family_price("framery", family, &config, today);
+
+        println!("\nPrice result: {:?}", price_result);
+
+        // Framery should now return a price (even if 0 base + 0 surcharges)
+        assert!(
+            price_result.is_some(),
+            "Framery should return a price result (even if 0)"
+        );
+
+        if let Some(price) = price_result {
+            println!("  Base price: {} {}", price.base_price, price.currency);
+            println!("  Total: {} {}", price.total_price, price.currency);
+        }
+    }
+}
+
+#[test]
+fn test_fast_kr_price_variations() {
+    use ofml_interpreter::oap::engine::ConfigurationEngine;
+    use ofml_interpreter::oap::families::{FamilyConfiguration, FamilyLoader};
+
+    // Clear cache to ensure we get fresh data
+    clear_property_cache();
+
+    let path = Path::new("/reference/ofmldata");
+    let mfr_path = Path::new("/reference/ofmldata/fast");
+    if !mfr_path.exists() {
+        println!("FAST manufacturer data not available, skipping test");
+        return;
+    }
+
+    let loader = FamilyLoader::load(mfr_path, "DE");
+
+    // Find KR family (Kreise)
+    let kr_family = loader.get_families().iter().find(|f| f.series.to_uppercase() == "KR");
+    if kr_family.is_none() {
+        println!("KR family not found, skipping test");
+        return;
+    }
+    let kr_family = kr_family.unwrap();
+    println!("\n=== Testing FAST KR (Kreise) pricing ===");
+    println!("Family: {} - {}", kr_family.id, kr_family.name);
+    println!("Base article: {}", kr_family.base_article_nr);
+    println!("Property classes: {:?}", kr_family.prop_classes);
+
+    let props = loader.get_properties_for_family(kr_family);
+    println!("\nProperties:");
+    for prop in &props {
+        println!("  {} ({}) - {} options: {:?}", 
+            prop.key, 
+            prop.label, 
+            prop.options.len(),
+            prop.options.iter().map(|o| &o.value).collect::<Vec<_>>()
+        );
+    }
+
+    let engine = ConfigurationEngine::new(path);
+    let today = chrono::Local::now().date_naive();
+
+    // Test different Abmessung (size) values - this should change prices
+    println!("\n--- Testing Abmessung variations ---");
+    for size in &["100X60", "35X35", "22X22"] {
+        let mut config = FamilyConfiguration::new(&kr_family.id, &props);
+        config.set("Abmessung", size);
+
+        println!("\n  Abmessung = {}", size);
+        let price = engine.calculate_family_price("fast", kr_family, &config, today);
+        if let Some(p) = price {
+            println!("  Price: {} {}", p.total_price, p.currency);
+        } else {
+            println!("  Price: None");
+        }
+    }
+
+    // Test different Farbe_Rahmen (color) values - this should also change prices
+    println!("\n--- Testing Farbe_Rahmen variations ---");
+    for color in &["VOLLHOLZ_SCHWARZ", "VOLLHOLZ_EICHE", "MDF_WEIS"] {
+        let mut config = FamilyConfiguration::new(&kr_family.id, &props);
+        config.set("Farbe_Rahmen", color);
+
+        println!("\n  Farbe_Rahmen = {}", color);
+        let price = engine.calculate_family_price("fast", kr_family, &config, today);
+        if let Some(p) = price {
+            println!("  Price: {} {}", p.total_price, p.currency);
+        } else {
+            println!("  Price: None");
+        }
+    }
+
+    println!("\n=== FAST KR test complete ===");
+}
+
+#[test]
+fn test_fast_kr_form_options_debug() {
+    use ofml_interpreter::ebase::EBaseReader;
+
+    let path = std::path::Path::new("/reference/ofmldata/fast/kr/DE/1/db/pdata.ebase");
+    if !path.exists() {
+        println!("FAST KR data not available, skipping test");
+        return;
+    }
+
+    let mut reader = EBaseReader::open(path).expect("Should open FAST KR ebase");
+
+    // Check ocd_propertyvalue for Form property
+    println!("\n=== Form property values in ocd_propertyvalue ===");
+    if let Ok(values) = reader.read_records("ocd_propertyvalue", Some(100)) {
+        let form_values: Vec<_> = values.iter()
+            .filter(|v| {
+                let prop = v.get("property").and_then(|v| v.as_str()).unwrap_or("");
+                prop.to_uppercase() == "FORM"
+            })
+            .collect();
+        println!("Form values: {}", form_values.len());
+        for v in &form_values {
+            let value = v.get("value_from").and_then(|v| v.as_str()).unwrap_or("");
+            let prop_class = v.get("prop_class").and_then(|v| v.as_str()).unwrap_or("");
+            println!("  {} = {}", prop_class, value);
+        }
+    }
+
+    // Check what properties exist
+    println!("\n=== All properties ===");
+    if let Ok(props) = reader.read_records("ocd_property", Some(50)) {
+        for p in &props {
+            let name = p.get("property").and_then(|v| v.as_str()).unwrap_or("");
+            let prop_class = p.get("prop_class").and_then(|v| v.as_str()).unwrap_or("");
+            let scope = p.get("scope").and_then(|v| v.as_str()).unwrap_or("");
+            println!("  {} | {} | scope={}", prop_class, name, scope);
+        }
+    }
+}
+
+#[test]
+fn test_fast_kr_varcond_debug() {
+    use ofml_interpreter::oap::ocd_properties::{load_manufacturer_properties, clear_property_cache};
+
+    clear_property_cache();
+
+    let path = Path::new("/reference/ofmldata/fast");
+    if !path.exists() {
+        println!("FAST data not available");
+        return;
+    }
+
+    let reader = load_manufacturer_properties(path);
+
+    println!("\n=== Testing var_cond computation for KR ===\n");
+
+    // Show custom tables
+    println!("Custom tables available:");
+    for (name, data) in &reader.custom_tables {
+        println!("  {} ({} rows)", name, data.len());
+        if name.contains("groesse") || name.contains("artikelnummer") {
+            if let Some(first) = data.first() {
+                println!("    Columns: {:?}", first.keys().collect::<Vec<_>>());
+            }
+        }
+    }
+
+    // Show relations for KR/Rahmen class
+    println!("\nRelations:");
+    for (name, rels) in &reader.relations {
+        println!("  {}:", name);
+        for rel in rels {
+            println!("    {}", rel.rel_block);
+        }
+    }
+
+    // Test var_cond computation for KR
+    let mut selections: HashMap<String, String> = HashMap::new();
+    selections.insert("Abmessung".to_string(), "100X60".to_string());
+    selections.insert("Farbe_Rahmen".to_string(), "VOLLHOLZ_SCHWARZ".to_string());
+    selections.insert("Moos".to_string(), "Kreise".to_string()); // Try Moos property
+    selections.insert("Form".to_string(), "KR1".to_string());
+
+    println!("\nSelections: {:?}", selections);
+    println!("uses_table_varcond: {}", reader.uses_table_varcond());
+
+    let varcond = reader.compute_varcond_from_selections("Rahmen", &selections);
+    println!("Computed var_cond: {:?}", varcond);
+}

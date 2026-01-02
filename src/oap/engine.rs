@@ -817,7 +817,7 @@ fn match_prices_to_variant_with_computed_varcond<'a>(
 
     // STEP 1: Find base price
     // First try computed var_cond (from TABLE relations) if provided
-    let base_price = if let Some(computed) = computed_varcond {
+    let base_price_opt = if let Some(computed) = computed_varcond {
         // Use the computed var_cond to find the matching base price
         prices
             .iter()
@@ -858,10 +858,26 @@ fn match_prices_to_variant_with_computed_varcond<'a>(
         prices
             .iter()
             .find(|p| base_indicators.iter().any(|ind| p.var_cond == *ind || p.var_cond.is_empty()))
-    })
-    .or_else(|| prices.first())?;
+    });
 
-    let base_amount = Decimal::from_f32_retain(base_price.price).unwrap_or(Decimal::ZERO);
+    // Check if this is surcharge-only pricing (like Framery)
+    let is_surcharge_only = base_price_opt.is_none() && reader.has_surcharge_only_pricing();
+
+    // For surcharge-only pricing, use first surcharge as base reference (with zero base amount)
+    // The actual pricing will come from summing applicable surcharges
+    // Otherwise require a base price
+    let base_price = if is_surcharge_only {
+        prices.iter().find(|p| p.price_level == "X")
+    } else {
+        base_price_opt.or_else(|| prices.first())
+    }?;
+
+    // For surcharge-only pricing, base amount is 0 (all value comes from surcharges)
+    let base_amount = if is_surcharge_only {
+        Decimal::ZERO
+    } else {
+        Decimal::from_f32_retain(base_price.price).unwrap_or(Decimal::ZERO)
+    };
 
     // Build variant map for heuristic matching
     let variant_map: HashMap<&str, &str> = variant_code
