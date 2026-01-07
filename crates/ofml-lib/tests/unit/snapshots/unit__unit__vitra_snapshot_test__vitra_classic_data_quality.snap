@@ -1,0 +1,13 @@
+---
+source: crates/ofml-lib/tests/unit/vitra_snapshot_test.rs
+expression: stats
+---
+{
+  "total_articles": 220,
+  "valid_series_articles": 172,
+  "corrupt_series_articles": 48,
+  "articles_with_prop_class": 80,
+  "base_prices": 252,
+  "surcharges": 3040,
+  "family_count": 3
+}

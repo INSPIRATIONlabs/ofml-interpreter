@@ -1,0 +1,15 @@
+---
+source: tests/unit/ocd_snapshot_test.rs
+expression: stats
+---
+{
+  "article_count": 2,
+  "price_count": 60,
+  "base_price_count": 8,
+  "surcharge_count": 52,
+  "short_text_count": 2,
+  "propvalue2varcond_count": 0,
+  "unique_currencies": [
+    "EUR"
+  ]
+}

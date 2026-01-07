@@ -1,0 +1,27 @@
+---
+source: tests/unit/tui_snapshot_test.rs
+expression: buffer_str
+---
+OAP Konfigurator - Sedus - Produktfamilien                                      
+                                                                                
+────────────────────────────────────────────────────────────────────────────────
+┌ Sedus - Produktfamilien (2, 1 konfigurierbar) ───────────────────────────────┐
+│▶  ⚙ ai           Drehstuhl se:air (5 Art.)                                   │
+│   ○ ap           Konferenzstuhl ap (3 Art.)                                  │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+────────────────────────────────────────────────────────────────────────────────
+↑↓: Navigation | Enter: Auswählen | /: Suchen | q: Beend

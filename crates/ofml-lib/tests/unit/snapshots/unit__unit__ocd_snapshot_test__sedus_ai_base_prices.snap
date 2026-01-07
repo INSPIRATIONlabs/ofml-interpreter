@@ -1,0 +1,41 @@
+---
+source: tests/unit/ocd_snapshot_test.rs
+expression: prices
+---
+[
+  {
+    "article_nr": "AI-121",
+    "price_level": "B",
+    "var_cond": "S_PGX",
+    "amount": 599.0,
+    "currency": "EUR"
+  },
+  {
+    "article_nr": "AI-121",
+    "price_level": "B",
+    "var_cond": "S_PGX",
+    "amount": 599.0,
+    "currency": "EUR"
+  },
+  {
+    "article_nr": "AI-121",
+    "price_level": "B",
+    "var_cond": "S_PGX",
+    "amount": 647.0,
+    "currency": "EUR"
+  },
+  {
+    "article_nr": "AI-121",
+    "price_level": "B",
+    "var_cond": "S_PGX",
+    "amount": 616.0,
+    "currency": "EUR"
+  },
+  {
+    "article_nr": "AI-821",
+    "price_level": "B",
+    "var_cond": "S_PGX",
+    "amount": 599.0,
+    "currency": "EUR"
+  }
+]

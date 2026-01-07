@@ -4,38 +4,60 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-OFML Interpreter is a Rust library and CLI for interpreting OFML (Office Furniture Modeling Language) data. It provides:
+OFML Interpreter is a Rust workspace for interpreting OFML (Office Furniture Modeling Language) data. It provides:
 - CLS bytecode interpreter for OFML class files
 - EBase file format reader
 - OAP (OFML Article Properties) configurator with pricing
 - Terminal UI for product configuration
 
+## Workspace Structure
+
+```
+crates/
+├── ofml-lib/     # Core library - all OFML parsing and business logic
+├── ofml-tui/     # Terminal UI - product configurator
+└── ofml-cli/     # CLI - command-line interface
+```
+
 ## Development Commands
 
 ```bash
-cargo build --features tui --release    # Build with TUI support
-cargo build                             # Build without TUI
-cargo test                              # Run all tests
-cargo test test_name -- --nocapture     # Run specific test with output
-cargo clippy                            # Lint code
-cargo fmt                               # Format code
+# Build entire workspace
+cargo build --workspace
+
+# Build individual crates
+cargo build -p ofml-lib
+cargo build -p ofml-tui
+cargo build -p ofml-cli
+
+# Run tests
+cargo test --workspace                    # All tests
+cargo test -p ofml-lib                    # Library tests only
+cargo test -p ofml-lib --test unit        # Unit tests
+
+# Lint and format
+cargo clippy --workspace
+cargo fmt
 
 # Run TUI configurator
-./target/release/ofml tui /reference/ofmldata
+cargo run -p ofml-tui -- /reference/ofmldata
+
+# Run CLI
+cargo run -p ofml-cli -- manufacturers /reference/ofmldata
 ```
 
-## Key Modules
+## Key Modules (ofml-lib)
 
 | Module | Purpose |
 |--------|---------|
-| `src/oap/` | OAP (OFML Article Properties) configurator |
-| `src/oap/engine.rs` | Configuration engine with price calculation |
-| `src/oap/ocd.rs` | OCD data reader (articles, prices, texts) |
-| `src/oap/ocd_properties.rs` | OCD property definitions and values |
-| `src/oap/families.rs` | Product family grouping and configuration |
-| `src/tui/` | Terminal UI for product configuration |
-| `src/interpreter.rs` | CLS bytecode interpreter |
-| `src/ebase.rs` | EBase file format reader |
+| `oap/engine.rs` | Configuration engine with price calculation |
+| `oap/ocd.rs` | OCD data reader (articles, prices, texts) |
+| `oap/ocd_properties.rs` | OCD property definitions and values |
+| `oap/families.rs` | Product family grouping and configuration |
+| `oap/price.rs` | Price lookup and calculation |
+| `interpreter.rs` | CLS bytecode interpreter |
+| `ebase.rs` | EBase file format reader |
+| `operations.rs` | High-level operations (export, assembly) |
 
 ## OCD Pricing Model
 
@@ -59,9 +81,10 @@ let base_indicators = ["S_PGX", "BASE", "STANDARD", ""];
 
 ## Documentation
 
+- `docs/LIBRARY-OVERVIEW.md` - Library architecture
+- `docs/DATA-FORMATS.md` - OFML data format documentation
+- `docs/PRICING-GUIDE.md` - Pricing system guide
 - `docs/OCD-PRICING-IMPLEMENTATION.md` - Pricing implementation details
-- `docs/OFML-EXPLAINED.md` - OFML concepts
-- `docs/CLS-EXAMPLES.md` - CLS bytecode examples
 - `docs/ofml-specs/ocd_4_3.md` - OCD specification
 - `docs/ofml-specs/ofml_20r3-en.md` - OFML 2.0 specification
 
@@ -82,16 +105,27 @@ let base_indicators = ["S_PGX", "BASE", "STANDARD", ""];
 ## Development Rules
 
 - **No silent TODOs or workarounds**: Do not add `// TODO` comments or incomplete implementations without asking. Either implement the feature fully or ask if it should be implemented. Never silently defer work.
-- **Complete implementations**: When implementing a feature, ensure all parts are connected and working. For example, if adding price calculation, ensure it's triggered when relevant (e.g., on property change).
+- **Complete implementations**: When implementing a feature, ensure all parts are connected and working.
+- **Library-first**: All business logic goes in ofml-lib. TUI and CLI are thin wrappers.
+- **Generic code**: No manufacturer-specific code. The library must handle all OFML data generically.
 
 ## Dependencies
 
-Key crates:
-- `logos` - Lexer generation
-- `serde/serde_json` - Serialization
-- `zip` - ALB archive handling
-- `gltf` - GLB export
-- `byteorder` - Binary parsing
-- `thiserror` - Error handling
-- `ratatui` - Terminal UI (feature: tui)
-- `crossterm` - Terminal handling (feature: tui)
+| Crate | Purpose | Location |
+|-------|---------|----------|
+| `logos` | Lexer generation | ofml-lib |
+| `serde/serde_json` | Serialization | all |
+| `zip` | ALB archive handling | ofml-lib |
+| `gltf` | GLB export | ofml-lib |
+| `byteorder` | Binary parsing | ofml-lib |
+| `thiserror` | Error handling | ofml-lib |
+| `ratatui` | Terminal UI | ofml-tui |
+| `crossterm` | Terminal handling | ofml-tui |
+| `clap` | CLI parsing | ofml-tui, ofml-cli |
+
+## Test Coverage
+
+- 601+ tests across the workspace
+- Integration tests for all 108 manufacturers in /reference/ofmldata
+- Unit tests for pricing, properties, OCD parsing
+- Snapshot tests for TUI rendering

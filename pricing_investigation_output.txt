@@ -1,0 +1,159 @@
+warning: constant `STANDARD_TABLES` is never used
+  --> src/tui/views/tables.rs:21:7
+   |
+21 | const STANDARD_TABLES: &[&str] = &[
+   |       ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `is_standard_table` is never used
+  --> src/tui/views/tables.rs:44:4
+   |
+44 | fn is_standard_table(name: &str) -> bool {
+   |    ^^^^^^^^^^^^^^^^^
+
+warning: `ofml-interpreter` (lib) generated 2 warnings
+    Finished `release` profile [optimized] target(s) in 0.13s
+Error running command for /reference/ofmldata/framery/frmr_one/ANY/1/db/pdata.ebase/ocd_price: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/framery/frmr_one/ANY/1/db/pdata.ebase/ocd_propvalue2varcond: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/framery/frmr_one/ANY/1/db/pdata.ebase/ocd_propertyclass: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/framery/frmr_one/ANY/1/db/pdata.ebase/ocd_propertyvalue: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/framery/frmr_one/ANY/1/db/pdata.ebase/ocd_article: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/framery/frmr_2q/ANY/1/db/pdata.ebase/ocd_price: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/framery/frmr_2q/ANY/1/db/pdata.ebase/ocd_propvalue2varcond: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/framery/frmr_2q/ANY/1/db/pdata.ebase/ocd_propertyclass: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/framery/frmr_2q/ANY/1/db/pdata.ebase/ocd_propertyvalue: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/framery/frmr_2q/ANY/1/db/pdata.ebase/ocd_article: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/framery/frmr_q/ANY/1/db/pdata.ebase/ocd_price: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/framery/frmr_q/ANY/1/db/pdata.ebase/ocd_propvalue2varcond: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/framery/frmr_q/ANY/1/db/pdata.ebase/ocd_propertyclass: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/framery/frmr_q/ANY/1/db/pdata.ebase/ocd_propertyvalue: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/framery/frmr_q/ANY/1/db/pdata.ebase/ocd_article: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/fast/kr/DE/1/db/pdata.ebase/ocd_price: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/fast/kr/DE/1/db/pdata.ebase/ocd_propvalue2varcond: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/fast/kr/DE/1/db/pdata.ebase/ocd_propertyclass: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/fast/kr/DE/1/db/pdata.ebase/ocd_propertyvalue: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/fast/kr/DE/1/db/pdata.ebase/ocd_article: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/fast/wkm/DE/1/db/pdata.ebase/ocd_price: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/fast/wkm/DE/1/db/pdata.ebase/ocd_propvalue2varcond: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/fast/wkm/DE/1/db/pdata.ebase/ocd_propertyclass: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/fast/wkm/DE/1/db/pdata.ebase/ocd_propertyvalue: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/fast/wkm/DE/1/db/pdata.ebase/ocd_article: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/sex/ai/DE/1/db/pdata.ebase/ocd_price: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/sex/ai/DE/1/db/pdata.ebase/ocd_propvalue2varcond: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/sex/ai/DE/1/db/pdata.ebase/ocd_propertyclass: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/sex/ai/DE/1/db/pdata.ebase/ocd_propertyvalue: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Error running command for /reference/ofmldata/sex/ai/DE/1/db/pdata.ebase/ocd_article: [Errno 2] No such file or directory: '/workspace/target/release/ofml'
+Building OFML tool...
+
+================================================================================
+ANALYZING: framery/frmr_one
+Path: /reference/ofmldata/framery/frmr_one/ANY/1/db/pdata.ebase
+================================================================================
+
+--- OCD_PRICE TABLE ---
+
+--- OCD_PROPVALUE2VARCOND TABLE ---
+Table does NOT exist or is empty
+
+--- OCD_PROPERTYCLASS TABLE ---
+
+--- OCD_PROPERTYVALUE TABLE ---
+
+--- OCD_ARTICLE TABLE ---
+
+================================================================================
+ANALYZING: framery/frmr_2q
+Path: /reference/ofmldata/framery/frmr_2q/ANY/1/db/pdata.ebase
+================================================================================
+
+--- OCD_PRICE TABLE ---
+
+--- OCD_PROPVALUE2VARCOND TABLE ---
+Table does NOT exist or is empty
+
+--- OCD_PROPERTYCLASS TABLE ---
+
+--- OCD_PROPERTYVALUE TABLE ---
+
+--- OCD_ARTICLE TABLE ---
+
+================================================================================
+ANALYZING: framery/frmr_q
+Path: /reference/ofmldata/framery/frmr_q/ANY/1/db/pdata.ebase
+================================================================================
+
+--- OCD_PRICE TABLE ---
+
+--- OCD_PROPVALUE2VARCOND TABLE ---
+Table does NOT exist or is empty
+
+--- OCD_PROPERTYCLASS TABLE ---
+
+--- OCD_PROPERTYVALUE TABLE ---
+
+--- OCD_ARTICLE TABLE ---
+
+================================================================================
+ANALYZING: fast/kr
+Path: /reference/ofmldata/fast/kr/DE/1/db/pdata.ebase
+================================================================================
+
+--- OCD_PRICE TABLE ---
+
+--- OCD_PROPVALUE2VARCOND TABLE ---
+Table does NOT exist or is empty
+
+--- OCD_PROPERTYCLASS TABLE ---
+
+--- OCD_PROPERTYVALUE TABLE ---
+
+--- OCD_ARTICLE TABLE ---
+
+================================================================================
+ANALYZING: fast/wkm
+Path: /reference/ofmldata/fast/wkm/DE/1/db/pdata.ebase
+================================================================================
+
+--- OCD_PRICE TABLE ---
+
+--- OCD_PROPVALUE2VARCOND TABLE ---
+Table does NOT exist or is empty
+
+--- OCD_PROPERTYCLASS TABLE ---
+
+--- OCD_PROPERTYVALUE TABLE ---
+
+--- OCD_ARTICLE TABLE ---
+
+================================================================================
+ANALYZING: sedus/ai
+Path: /reference/ofmldata/sex/ai/DE/1/db/pdata.ebase
+================================================================================
+
+--- OCD_PRICE TABLE ---
+
+--- OCD_PROPVALUE2VARCOND TABLE ---
+Table does NOT exist or is empty
+
+--- OCD_PROPERTYCLASS TABLE ---
+
+--- OCD_PROPERTYVALUE TABLE ---
+
+--- OCD_ARTICLE TABLE ---
+SKIPPING bisley/systemfile: /reference/ofmldata/bisley/systemfile/DE/1/db/pdata.ebase does not exist
+SKIPPING arper/catifa46: /reference/ofmldata/arper/catifa46/DE/1/db/pdata.ebase does not exist
+
+========================================================================================================================
+PRICING PATTERNS COMPARISON TABLE
+========================================================================================================================
+Manufacturer    Series               Base Pattern                   Surch Pattern                  propvalue2varcond?  
+------------------------------------------------------------------------------------------------------------------------
+framery         frmr_one             UNKNOWN                        UNKNOWN                        NO                  
+framery         frmr_2q              UNKNOWN                        UNKNOWN                        NO                  
+framery         frmr_q               UNKNOWN                        UNKNOWN                        NO                  
+fast            kr                   UNKNOWN                        UNKNOWN                        NO                  
+fast            wkm                  UNKNOWN                        UNKNOWN                        NO                  
+sedus           ai                   UNKNOWN                        UNKNOWN                        NO                  
+
+Detailed results saved to: /workspace/pricing_investigation_results.json

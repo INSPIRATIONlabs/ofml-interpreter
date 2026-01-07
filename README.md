@@ -1,6 +1,15 @@
 # OFML Interpreter
 
-A Rust implementation of the Office Furniture Modeling Language (OFML) for parsing, executing, and converting furniture product data to modern 3D formats.
+A Rust workspace for interpreting OFML (Office Furniture Modeling Language) data, providing parsing, execution, and conversion of furniture product data to modern 3D formats.
+
+## Workspace Structure
+
+```
+crates/
+├── ofml-lib/     # Core library - OFML parsing and business logic
+├── ofml-tui/     # Terminal UI - interactive product configurator
+└── ofml-cli/     # CLI - command-line interface
+```
 
 ## Features
 
@@ -10,47 +19,111 @@ A Rust implementation of the Office Furniture Modeling Language (OFML) for parsi
 - **2D Floor Plans** - Generate SVG floor plans from odb2d data
 - **Material System** - MAT file parsing with texture support (PNG/JPG/TGA/BMP)
 - **ALB Archive Support** - Extract files from encrypted OFML archives
+- **TUI Product Configurator** - Interactive terminal interface for configuring products
+- **Parallel Processing** - Multi-threaded data loading with rayon
+- **Price Calculation** - Full OCD pricing with base prices and surcharges
 
 ## Quick Start
 
 ```bash
-# Build
-cargo build --release
+# Build entire workspace
+cargo build --workspace --release
 
-# Convert a 3DS file to GLB
-./target/release/ofml convert model.3ds
+# Run the TUI Configurator
+cargo run -p ofml-tui --release -- /path/to/ofmldata
 
-# Assemble a product from OFML data
-./target/release/ofml product /path/to/ofmldata/vitra/ac/1 AC_CHAIR output.glb
+# Run CLI commands
+cargo run -p ofml-cli --release -- manufacturers /path/to/ofmldata
+cargo run -p ofml-cli --release -- configure /path/to/ofmldata vitra ac
 
-# Generate 2D floor plan
-./target/release/ofml svg /path/to/odb.ebase floorplan.svg
-
-# Explore OFML data
-./target/release/ofml ofml /path/to/ofmldata
+# Or use the built binaries
+./target/release/ofml-tui /path/to/ofmldata
+./target/release/ofml manufacturers /path/to/ofmldata
 ```
+
+## TUI Configurator
+
+The interactive Terminal User Interface allows you to:
+- Browse manufacturers and product families
+- Configure products with property selection
+- Calculate prices with surcharges
+- Export configurations to JSON
+- Export geometry to GLB
+- Save/load configurations (`Ctrl+S`/`Ctrl+O`)
+- Mark favorites (`f` key)
+- Toggle light/dark theme (`T` key)
+
+### TUI Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `↑↓` | Navigate |
+| `←→` | Change property value |
+| `Enter` | Select |
+| `/` | Search |
+| `f` | Toggle favorite |
+| `T` | Toggle theme |
+| `Ctrl+S` | Save configuration |
+| `Ctrl+O` | Load configuration |
+| `Ctrl+G` | Export geometry (GLB) |
+| `e` | Export to JSON |
+| `t` | Table browser |
+| `F12` | Debug panel |
+| `?` | Help |
+| `q` | Quit |
 
 ## CLI Commands
 
 | Command | Description |
 |---------|-------------|
+| `manufacturers` | List available manufacturers |
+| `articles` | List articles for a manufacturer |
+| `configure` | Configure a product and display pricing |
+| `catalog` | Browse XCF catalog structure |
 | `convert` | Convert 3DS/GEO/OBJ to GLB |
 | `merge` | Merge multiple geometry files |
 | `product` | Assemble product from OFML data |
-| `gsx` | Convert GSX/Sedus products (OBJ-based) |
-| `build` | Execute CLS scripts and export GLB |
 | `svg` | Generate 2D SVG floor plan |
 | `ebase` | Explore EBASE database tables |
 | `alb` | List/extract ALB archive contents |
 | `cls` | List/extract CLS scripts from ALB |
-| `ofml` | Browse OFML data directory |
-| `export` | Execute CLS and export to GLB |
-| `run` | Execute CLS script |
-| `check` | Validate CLS syntax |
-| `parse` | Display CLS AST |
-| `tokenize` | Display CLS tokens |
-| `validate` | Validate geometry and show metrics |
-| `expr` | Evaluate EBASE expression |
+| `completions` | Generate shell completions |
+
+## Library Usage
+
+```rust
+use ofml_lib::oap::engine::ConfigurationEngine;
+use ofml_lib::oap::families::FamilyConfiguration;
+use std::path::Path;
+
+fn main() {
+    let data_path = Path::new("/path/to/ofmldata");
+    let mut engine = ConfigurationEngine::new(data_path);
+
+    // Load product families
+    let families = engine.load_families("vitra");
+
+    for family in families {
+        println!("{} - {} variants", family.name, family.variant_count);
+
+        // Get properties
+        let properties = engine.get_family_properties("vitra", &family.id);
+
+        // Create configuration
+        let config = FamilyConfiguration::new(&family.id, &properties);
+
+        // Calculate price
+        if let Some(price) = engine.calculate_family_price(
+            "vitra",
+            &family,
+            &config,
+            chrono::Local::now().date_naive(),
+        ) {
+            println!("  Price: {:.2} {}", price.total_price, price.currency);
+        }
+    }
+}
+```
 
 ## Supported Formats
 
@@ -67,60 +140,38 @@ cargo build --release
 ### Output
 - GLB (binary glTF 2.0)
 - SVG (2D floor plans)
-
-## Library Usage
-
-```rust
-use ofml_interpreter::operations::{load_geometry_file, export_to_glb};
-use std::path::Path;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let scene = load_geometry_file(Path::new("model.3ds"))?;
-    let glb = export_to_glb(&scene)?;
-    std::fs::write("output.glb", glb)?;
-    Ok(())
-}
-```
-
-## Documentation
-
-- [Understanding OFML](docs/OFML-EXPLAINED.md) - **Start here!** What is OFML, why CLS files exist, file formats explained
-- [Full Documentation](docs/README.md) - Comprehensive feature and command documentation
-- [Quickstart Guide](docs/QUICKSTART.md) - Get started in 5 minutes
-- [API Reference](docs/API.md) - Rust library API for developers
+- JSON (configuration export)
 
 ## Testing
 
 ```bash
-cargo test              # Run all tests (339 tests)
-cargo test --release    # Faster test execution
-cargo bench             # Run benchmarks
+# Run all tests (600+ tests)
+cargo test --workspace
+
+# Run library tests only
+cargo test -p ofml-lib
+
+# Run with output
+cargo test -p ofml-lib -- --nocapture
+
+# Run benchmarks
+cargo bench -p ofml-lib
 ```
 
 ## Statistics
 
-- **Tests**: 339 passing
-- **Code Coverage**: ~49%
-- **Manufacturers Verified**: 28+
-- **Modules**: 14 core modules
+- **Tests**: 601+ passing
+- **Manufacturers**: 108 supported
+- **Crates**: 3 (lib, tui, cli)
+- **Binary Size**: ~6MB (release, stripped)
 
-## Architecture
+## Documentation
 
-```
-src/
-├── lexer.rs         # CLS tokenizer
-├── parser.rs        # CLS parser
-├── interpreter.rs   # CLS execution
-├── geometry.rs      # 3D geometry (3DS/GEO/OBJ/GLB)
-├── geometry2d.rs    # 2D geometry (SVG)
-├── ebase.rs         # EBASE database reader
-├── ebase_expr.rs    # PostScript expression evaluator
-├── ofml.rs          # ALB archive handling
-├── ofml_classes.rs  # OFML framework classes (Go*, Oi*)
-├── material.rs      # Material system
-├── operations.rs    # High-level reusable operations
-└── ...
-```
+- [Library Overview](docs/LIBRARY-OVERVIEW.md) - Architecture and crate structure
+- [Data Formats](docs/DATA-FORMATS.md) - EBASE, OCD, ALB format documentation
+- [Pricing Guide](docs/PRICING-GUIDE.md) - Price calculation details
+- [OFML Explained](docs/OFML-EXPLAINED.md) - What is OFML, file formats
+- [OCD Specification](docs/ofml-specs/ocd_4_3.md) - OCD 4.3 specification
 
 ## OFML Compliance
 
@@ -130,6 +181,7 @@ Implements the following OFML specifications:
 - ODB 2.4 (EBASE database)
 - OMATS 2.2 (materials)
 - OLAYERS 1.3.1 (2D layers)
+- OCD 4.3 (catalog data)
 
 ## License
 

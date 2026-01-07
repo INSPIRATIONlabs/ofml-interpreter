@@ -1,0 +1,27 @@
+---
+source: tests/unit/tui_snapshot_test.rs
+expression: buffer_str
+---
+OAP Konfigurator - Hilfe                                                        
+                                                                                
+────────────────────────────────────────────────────────────────────────────────
+┌ Hilfe ───────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  OAP Konfigurator - Tastaturkürzel                                           │
+│                                                                              │
+│  Navigation:                                                                 │
+│    ↑/↓       In Liste navigieren                                             │
+│    PgUp/PgDn 10 Einträge vor/zurück                                          │
+│    Home/g    Zum Anfang der Liste                                            │
+│    End/G     Zum Ende der Liste                                              │
+│    Enter     Auswählen / Öffnen                                              │
+│    Esc       Zurück / Schließen                                              │
+│    h         Zur Herstellerliste (Home)                                      │
+│                                                                              │
+│  Aktionen:                                                                   │
+│    /         Suche starten                                                   │
+│    t         Tabellen-Browser öffnen                                         │
+│    e         Konfiguration exportieren (JSON)                                │
+└──────────────────────────────────────────────────────────────────────────────┘
+────────────────────────────────────────────────────────────────────────────────
+Esc: Zurück

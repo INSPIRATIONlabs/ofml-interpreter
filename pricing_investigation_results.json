@@ -1,0 +1,74 @@
+[
+  {
+    "manufacturer": "framery",
+    "series": "frmr_one",
+    "db_path": "/reference/ofmldata/framery/frmr_one/ANY/1/db/pdata.ebase",
+    "base_prices": [],
+    "surcharges": [],
+    "has_propvalue2varcond": false,
+    "propvalue2varcond_samples": [],
+    "property_classes": [],
+    "property_values": [],
+    "articles": []
+  },
+  {
+    "manufacturer": "framery",
+    "series": "frmr_2q",
+    "db_path": "/reference/ofmldata/framery/frmr_2q/ANY/1/db/pdata.ebase",
+    "base_prices": [],
+    "surcharges": [],
+    "has_propvalue2varcond": false,
+    "propvalue2varcond_samples": [],
+    "property_classes": [],
+    "property_values": [],
+    "articles": []
+  },
+  {
+    "manufacturer": "framery",
+    "series": "frmr_q",
+    "db_path": "/reference/ofmldata/framery/frmr_q/ANY/1/db/pdata.ebase",
+    "base_prices": [],
+    "surcharges": [],
+    "has_propvalue2varcond": false,
+    "propvalue2varcond_samples": [],
+    "property_classes": [],
+    "property_values": [],
+    "articles": []
+  },
+  {
+    "manufacturer": "fast",
+    "series": "kr",
+    "db_path": "/reference/ofmldata/fast/kr/DE/1/db/pdata.ebase",
+    "base_prices": [],
+    "surcharges": [],
+    "has_propvalue2varcond": false,
+    "propvalue2varcond_samples": [],
+    "property_classes": [],
+    "property_values": [],
+    "articles": []
+  },
+  {
+    "manufacturer": "fast",
+    "series": "wkm",
+    "db_path": "/reference/ofmldata/fast/wkm/DE/1/db/pdata.ebase",
+    "base_prices": [],
+    "surcharges": [],
+    "has_propvalue2varcond": false,
+    "propvalue2varcond_samples": [],
+    "property_classes": [],
+    "property_values": [],
+    "articles": []
+  },
+  {
+    "manufacturer": "sedus",
+    "series": "ai",
+    "db_path": "/reference/ofmldata/sex/ai/DE/1/db/pdata.ebase",
+    "base_prices": [],
+    "surcharges": [],
+    "has_propvalue2varcond": false,
+    "propvalue2varcond_samples": [],
+    "property_classes": [],
+    "property_values": [],
+    "articles": []
+  }
+]

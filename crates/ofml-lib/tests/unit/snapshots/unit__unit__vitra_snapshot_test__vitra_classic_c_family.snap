@@ -1,0 +1,27 @@
+---
+source: crates/ofml-lib/tests/unit/vitra_snapshot_test.rs
+expression: snapshot
+---
+{
+  "article_count": 44,
+  "first_10_articles": [
+    "20166000",
+    "21054600",
+    "21054700",
+    "21054800",
+    "21054900",
+    "21055000",
+    "21055100",
+    "21055200",
+    "21055300",
+    "41203400"
+  ],
+  "prop_class_count": 22,
+  "first_5_prop_classes": [
+    "PWG_21054900",
+    "PWG_21055000",
+    "PWG_21055100",
+    "LIE_412034",
+    "LOB_412078"
+  ]
+}

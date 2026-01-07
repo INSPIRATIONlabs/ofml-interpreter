@@ -1,0 +1,76 @@
+---
+source: tests/unit/ocd_snapshot_test.rs
+expression: surcharges
+---
+[
+  {
+    "article_nr": "AI-121",
+    "price_level": "X",
+    "var_cond": "S_1513",
+    "amount": 228.0,
+    "currency": "EUR"
+  },
+  {
+    "article_nr": "AI-121",
+    "price_level": "X",
+    "var_cond": "S_1513",
+    "amount": 222.0,
+    "currency": "EUR"
+  },
+  {
+    "article_nr": "AI-121",
+    "price_level": "X",
+    "var_cond": "S_1513",
+    "amount": 222.0,
+    "currency": "EUR"
+  },
+  {
+    "article_nr": "AI-121",
+    "price_level": "X",
+    "var_cond": "S_1513",
+    "amount": 228.0,
+    "currency": "EUR"
+  },
+  {
+    "article_nr": "AI-121",
+    "price_level": "X",
+    "var_cond": "S_166",
+    "amount": 44.0,
+    "currency": "EUR"
+  },
+  {
+    "article_nr": "AI-121",
+    "price_level": "X",
+    "var_cond": "S_166",
+    "amount": 43.0,
+    "currency": "EUR"
+  },
+  {
+    "article_nr": "AI-121",
+    "price_level": "X",
+    "var_cond": "S_166",
+    "amount": 44.0,
+    "currency": "EUR"
+  },
+  {
+    "article_nr": "AI-121",
+    "price_level": "X",
+    "var_cond": "S_167",
+    "amount": 44.0,
+    "currency": "EUR"
+  },
+  {
+    "article_nr": "AI-121",
+    "price_level": "X",
+    "var_cond": "S_167",
+    "amount": 43.0,
+    "currency": "EUR"
+  },
+  {
+    "article_nr": "AI-121",
+    "price_level": "X",
+    "var_cond": "S_167",
+    "amount": 44.0,
+    "currency": "EUR"
+  }
+]

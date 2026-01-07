@@ -1,0 +1,21 @@
+[package]
+name = "ofml-cli"
+version = "0.1.0"
+edition = "2021"
+description = "CLI for OFML/CLS interpreter"
+license = "MIT"
+
+[[bin]]
+name = "ofml"
+path = "src/main.rs"
+
+[dependencies]
+ofml-lib = { path = "../ofml-lib" }
+clap = { version = "4.5", features = ["derive"] }
+clap_complete = "4.5"
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+zip = "2.1"

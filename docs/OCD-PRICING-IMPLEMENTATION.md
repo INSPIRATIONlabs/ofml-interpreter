@@ -110,6 +110,35 @@ S_STOFF=2G3;S_SITZHOEHE=1701;S_LEHNE_ABW=0000;...
 
 Format: `PROPERTY_KEY=selected_value;...` (sorted alphabetically)
 
+### Pricing Strategy Detection
+
+The implementation automatically detects different manufacturer pricing strategies:
+
+```rust
+pub enum PricingStrategy {
+    EmptyBase,      // Empty var_cond with named surcharges (Framery, Bisley)
+    ProductGroup,   // Product group codes like S_PGX (Sedus)
+    TableComputed,  // TABLE-based var_cond (FAST)
+    ComplexCode,    // Complex encoded var_cond
+    SurchargeOnly,  // No base price, only surcharges (some manufacturers)
+}
+```
+
+### Two-Pass Price Lookup
+
+For robust price matching:
+
+1. **First pass**: Exact article number match
+2. **Second pass**: Wildcard fallback (article_nr = "*")
+
+### Corrupted Record Recovery
+
+The implementation detects and recovers from corrupted EBase records:
+
+- Detection: 8-byte offset shift pattern (common in Framery data)
+- Recovery: Attempts to parse with shifted offsets
+- Reporting: DataWarning generated for tracking
+
 ### Current Limitations
 
 1. **Complex Rule Evaluation**: The full SAP-style variant condition logic in `ocd_relation` is not implemented. This would require a rule evaluation engine.
@@ -139,6 +168,21 @@ if let Some(result) = price {
 }
 ```
 
+### Export Format
+
+Configurations can be exported to JSON conforming to the schema in `specs/001-universal-ocd-reader/contracts/export-schema.json`:
+
+```rust
+use ofml_interpreter::oap::{export_family_json, create_export_configuration};
+
+// Export single configuration
+let json = export_family_json(manufacturer_id, series_id, article_nr, &config, price.as_ref(), &warnings);
+
+// Batch export
+let configs = vec![export1, export2, export3];
+let json = export_family_json_batch(configs);
+```
+
 ## Future Improvements
 
 1. **Rule Engine**: Implement evaluation of `ocd_relation` rules to properly determine variant conditions.
@@ -147,7 +191,7 @@ if let Some(result) = price {
 
 3. **Multi-Currency Support**: Handle currency conversion for international pricing.
 
-4. **Discount Calculation**: Implement Level 'D' discount rules.
+4. **Discount Calculation**: Implement Level 'D' discount rules fully (currently discounts are combined as negative surcharges).
 
 ## References
 

@@ -1,0 +1,30 @@
+---
+source: crates/ofml-lib/tests/unit/vitra_snapshot_test.rs
+expression: snapshots
+---
+[
+  {
+    "id": "C",
+    "name": "EPC DSS P.Side Chair",
+    "base_article_nr": "20166000",
+    "variant_count": 44,
+    "is_configurable": true,
+    "prop_class_count": 22
+  },
+  {
+    "id": "ET",
+    "name": "Serie ET",
+    "base_article_nr": "92601900",
+    "variant_count": 5,
+    "is_configurable": true,
+    "prop_class_count": 0
+  },
+  {
+    "id": "VI",
+    "name": "VI",
+    "base_article_nr": "41210001",
+    "variant_count": 1,
+    "is_configurable": false,
+    "prop_class_count": 0
+  }
+]

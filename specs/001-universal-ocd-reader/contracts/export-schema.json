@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ofml-interpreter/export-schema.json",
+  "title": "OFML Configuration Export",
+  "description": "Schema for exported product configurations",
+
+  "definitions": {
+    "Surcharge": {
+      "type": "object",
+      "properties": {
+        "var_cond": { "type": "string" },
+        "description": { "type": ["string", "null"] },
+        "amount": { "type": "number" },
+        "is_percentage": { "type": "boolean" }
+      },
+      "required": ["var_cond", "amount", "is_percentage"]
+    },
+
+    "Discount": {
+      "type": "object",
+      "properties": {
+        "var_cond": { "type": "string" },
+        "description": { "type": ["string", "null"] },
+        "amount": { "type": "number" },
+        "rule": {
+          "type": "string",
+          "enum": ["percent_of_base", "percent_of_accumulated"]
+        }
+      },
+      "required": ["var_cond", "amount", "rule"]
+    },
+
+    "Pricing": {
+      "type": "object",
+      "properties": {
+        "base": { "type": "number" },
+        "surcharges": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Surcharge" }
+        },
+        "discounts": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Discount" }
+        },
+        "total": { "type": "number" },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        }
+      },
+      "required": ["base", "surcharges", "discounts", "total", "currency"]
+    },
+
+    "Warning": {
+      "type": "object",
+      "properties": {
+        "severity": {
+          "type": "string",
+          "enum": ["info", "warning", "error"]
+        },
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "source": { "type": ["string", "null"] }
+      },
+      "required": ["severity", "code", "message"]
+    },
+
+    "Configuration": {
+      "type": "object",
+      "properties": {
+        "article_nr": { "type": "string" },
+        "manufacturer": { "type": "string" },
+        "series": { "type": "string" },
+        "configuration": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Map of property_id to selected value_id"
+        },
+        "pricing": { "$ref": "#/definitions/Pricing" },
+        "warnings": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Warning" }
+        },
+        "exported_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["article_nr", "manufacturer", "series", "configuration", "pricing", "exported_at"]
+    }
+  },
+
+  "oneOf": [
+    { "$ref": "#/definitions/Configuration" },
+    {
+      "type": "array",
+      "items": { "$ref": "#/definitions/Configuration" }
+    }
+  ]
+}

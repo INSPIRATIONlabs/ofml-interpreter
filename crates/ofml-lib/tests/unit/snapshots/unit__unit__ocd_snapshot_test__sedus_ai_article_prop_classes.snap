@@ -1,0 +1,20 @@
+---
+source: tests/unit/ocd_snapshot_test.rs
+expression: mappings
+---
+[
+  [
+    "AI-121",
+    [
+      "KLASSE_000000000000164057",
+      "KLASSE_HMERK"
+    ]
+  ],
+  [
+    "AI-821",
+    [
+      "KLASSE_000000000000164057",
+      "KLASSE_HMERK"
+    ]
+  ]
+]

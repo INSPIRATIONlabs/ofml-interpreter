@@ -1,0 +1,16 @@
+---
+source: tests/unit/ocd_snapshot_test.rs
+expression: articles
+---
+[
+  {
+    "article_nr": "AI-121",
+    "series": "AI",
+    "art_type": "C"
+  },
+  {
+    "article_nr": "AI-821",
+    "series": "AI",
+    "art_type": "C"
+  }
+]

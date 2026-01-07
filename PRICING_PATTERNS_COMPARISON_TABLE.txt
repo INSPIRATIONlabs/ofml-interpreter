@@ -1,0 +1,120 @@
+================================================================================
+MULTI-MANUFACTURER PRICING PATTERNS COMPARISON
+Investigation Date: 2026-01-02
+================================================================================
+
+MANUFACTURER OVERVIEW
+--------------------------------------------------------------------------------
+Manufacturer | Series    | Articles | Base Prices | Surcharges | Prop Classes
+--------------------------------------------------------------------------------
+Framery      | frmr_one  |    3     |      0 ⚠️   |     9      |      3
+Framery      | frmr_2q   |    3     |      2      |     7      |      3
+Framery      | frmr_q    |    4     |      2      |     7      |      4
+FAST         | kr        |    1     |      8      |     0      |      1
+FAST         | wkm       |    1     |     21      |     0      |      1
+Sedus        | ai        |    2     |      8      |    52      |      2
+Sedus        | sf        |    1     |      3      |     0      |      1
+Bisley       | sf        |  101     |     21      |     1      |     51
+Bisley       | pf        |   11     |      7      |     2      |      9
+Arper        | catifa46  |   62     |   1,525     |   145      |     31
+Arper        | saya      |   10     |     75      |     2      |      3
+--------------------------------------------------------------------------------
+
+BASE PRICE PATTERNS (level = 'B')
+--------------------------------------------------------------------------------
+Pattern          | Manufacturers        | Example var_cond Values
+--------------------------------------------------------------------------------
+Empty String     | Framery, Bisley     | ""
+S_PGX           | Sedus               | "S_PGX"
+Composite Code  | FAST                | "SG-KR-KM-D54-ES"
+Simple Numeric  | Arper (saya)        | "00", "01", "02", "03"
+Complex Codes   | Arper (catifa46)    | "0804W", "08PB", "00CT"
+--------------------------------------------------------------------------------
+
+SURCHARGE PATTERNS (level = 'X')
+--------------------------------------------------------------------------------
+Pattern          | Manufacturers        | Example var_cond Values
+--------------------------------------------------------------------------------
+PG_ Prefix      | Framery, Bisley     | "PG_CARPET_OPTION_COLOR"
+S_ Numeric      | Sedus               | "S_166", "S_1513", "S_2415_F2"
+DE_ Region      | Bisley              | "DE_ROLLADEN"
+Short Codes     | Arper               | "FUST02E", "IGN011", "STR0301"
+None            | FAST, Sedus sf      | (no surcharges)
+--------------------------------------------------------------------------------
+
+PRICE RANGES (EUR)
+--------------------------------------------------------------------------------
+Manufacturer | Series    | Min Price  | Max Price  | Product Type
+--------------------------------------------------------------------------------
+Framery      | frmr_2q   |  42,070    |  44,140    | Phone booth (2-person)
+Framery      | frmr_q    |  27,990    |  42,070    | Phone booth (4-person)
+FAST         | kr        |     184    |   1,344    | Wall decoration
+FAST         | wkm       |     100    |     403    | Wall decoration
+Sedus        | ai        |     599    |     647    | Office chair (base)
+Sedus        | sf        |     239    |     251    | Office chair
+Bisley       | sf        |      39    |   1,159    | File cabinet
+Bisley       | pf        |     179    |     369    | File cabinet
+Arper        | catifa46  |     195    |     604    | Chair
+Arper        | saya      |     384    |     600    | Table
+--------------------------------------------------------------------------------
+
+SURCHARGE EXAMPLES (EUR)
+--------------------------------------------------------------------------------
+Manufacturer | var_cond                    | Price  | Description
+--------------------------------------------------------------------------------
+Framery      | PG_WHITEBOARD_EXTERIORS     | +1,050 | Whiteboard panels
+Framery      | PG_LAN_PORT                 |  +420  | LAN port
+Framery      | PG_TABLE_H110               |  +135  | Table height 110cm
+Sedus        | S_1513                      |  +228  | Upholstery option
+Sedus        | S_166                       |   +44  | Armrest option
+Bisley       | PG_AUFPREIS_FARBE_15        |   +15  | Color surcharge
+Arper        | STR03AX                     |  +149  | Structure option
+Arper        | STR03AC                     |  +100  | Structure option
+Arper        | FUST02E                     |   +46  | Frame option
+--------------------------------------------------------------------------------
+
+KEY FINDINGS
+--------------------------------------------------------------------------------
+✓ Framery pricing is CORRECT - phone booths cost 27k-44k EUR
+✗ Framery ONE has ZERO base prices - CANNOT PRICE THIS PRODUCT
+✗ NO manufacturers use ocd_propvalue2varcond table in this dataset
+✗ NO universal var_cond pattern - each manufacturer uses own format
+✓ price_level field ('B'/'X'/'D') is reliable across all manufacturers
+✓ Wildcard article_nr='*' is used consistently for global surcharges
+
+IMPLEMENTATION REQUIREMENTS
+--------------------------------------------------------------------------------
+1. Implement TIERED base price lookup (empty → S_PGX → composite → fallback)
+2. Implement PATTERN MATCHING for surcharges (PG_, S_, DE_, etc.)
+3. Add DATA VALIDATION to detect missing base prices (like Framery ONE)
+4. Support MULTIPLE strategies - no single approach works for all
+5. Add MANUFACTURER-SPECIFIC handlers for complex cases (FAST, Arper)
+
+CRITICAL ISSUES
+--------------------------------------------------------------------------------
+⚠️  ISSUE 1: Framery ONE has no base prices (data error?)
+    - Impact: Cannot price ONE, ONE_PREMIUM, ONE_LOUNGE
+    - Action: Investigate CLS files or contact data provider
+
+⚠️  ISSUE 2: No propvalue2varcond table
+    - Impact: Must use pattern matching instead of direct lookup
+    - Action: Implement heuristic matching strategies
+
+RECOMMENDATIONS
+--------------------------------------------------------------------------------
+1. Fix Framery ONE base price issue FIRST (blocking)
+2. Implement tiered matching with comprehensive tests
+3. Add per-manufacturer optimizations (not required but helpful)
+4. Document all patterns in code with examples
+5. Create validation suite to catch data quality issues early
+
+FILES GENERATED
+--------------------------------------------------------------------------------
+• multi_mfr_pricing_analysis.rs                    - Analysis source code
+• MULTI_MANUFACTURER_PRICING_PATTERNS_REPORT.md    - Full investigation report
+• PRICING_IMPLEMENTATION_RECOMMENDATIONS.md        - Implementation guide
+• MANUFACTURER_PRICING_QUICK_REFERENCE.md          - Quick reference
+• PRICING_PATTERNS_COMPARISON_TABLE.txt            - This summary
+• COMPREHENSIVE_PRICING_INVESTIGATION.md           - Raw output
+
+================================================================================

@@ -1,0 +1,314 @@
+COMPREHENSIVE MULTI-MANUFACTURER PRICING INVESTIGATION
+========================================================================================================================
+
+================================================================================
+ANALYZING: framery/frmr_one
+Path: /reference/ofmldata/framery/frmr_one/ANY/1/db/pdata.ebase
+================================================================================
+
+--- OCD_PRICE TABLE ---
+Total price records: 9
+Base prices (level B): 0
+Surcharges (level X): 9
+
+Base price var_cond patterns: {}
+
+Surcharge var_cond samples (first 10): ["PG_ADJUSTABLE_SEAT", "PG_CARPET_OPTION_COLOR", "PG_TABLE_TOP_OPTION_COLOR", "PG_EXTERIOR_PANEL_OPTION_COLOR", "PG_SEAT_UPHOLSTERY_OPTION_COLOR", "PG_INTERIOR_PANEL_OPTION_COLOR", "PG_SERVICE_KIT", "PG_ACTIVATED_CARBON_FILTER", "PG_LAN"]
+
+Sample surcharges (first 5):
+  1. article_nr='*', var_cond='PG_SEAT_UPHOLSTERY_OPTION_COLOR', price=125 EUR
+  2. article_nr='*', var_cond='PG_CARPET_OPTION_COLOR', price=125 EUR
+  3. article_nr='*', var_cond='PG_TABLE_TOP_OPTION_COLOR', price=245 EUR
+  4. article_nr='*', var_cond='PG_INTERIOR_PANEL_OPTION_COLOR', price=735 EUR
+  5. article_nr='*', var_cond='PG_EXTERIOR_PANEL_OPTION_COLOR', price=735 EUR
+
+--- OCD_PROPVALUE2VARCOND TABLE ---
+Table does NOT exist or is empty
+
+--- OCD_PROPERTYCLASS TABLE ---
+Total article property class mappings: 3
+Sample property class mappings (first 5):
+  1. article_nr='ONE_LOUNGE', classes=["MG_GLOBAL", "MG_PROPERTIES"]
+  2. article_nr='ONE_PREMIUM', classes=["MG_GLOBAL", "MG_PROPERTIES"]
+  3. article_nr='ONE', classes=["MG_GLOBAL", "MG_PROPERTIES"]
+
+--- OCD_ARTICLE TABLE ---
+Total articles: 3
+Sample articles (first 5):
+  1. article_nr='ONE', manufacturer='FRAMERY', series='FRMR_ONE'
+  2. article_nr='ONE_PREMIUM', manufacturer='FRAMERY', series='FRMR_ONE'
+  3. article_nr='ONE_LOUNGE', manufacturer='FRAMERY', series='FRMR_ONE'
+
+================================================================================
+ANALYZING: framery/frmr_2q
+Path: /reference/ofmldata/framery/frmr_2q/ANY/1/db/pdata.ebase
+================================================================================
+
+--- OCD_PRICE TABLE ---
+Total price records: 9
+Base prices (level B): 2
+Surcharges (level X): 7
+
+Base price var_cond patterns: {""}
+
+Sample base prices (first 5):
+  1. article_nr='2Q_HUDDLE', var_cond='', price=44140 EUR
+  2. article_nr='2Q_WITHOUT_FURNITURE', var_cond='', price=42070 EUR
+
+Surcharge var_cond samples (first 10): ["PG_LAN_PORT", "PG_WHITEBOARD_EXTERIORS", "PG_TABLE_H90", "PG_PIAGGIO_TABLE_TWO", "PG_COPPER_DOOR_HANDLE", "PG_TABLE_H110", "PG_SMART_LOCK"]
+
+Sample surcharges (first 5):
+  1. article_nr='*', var_cond='PG_TABLE_H110', price=135 EUR
+  2. article_nr='*', var_cond='PG_TABLE_H90', price=85 EUR
+  3. article_nr='*', var_cond='PG_LAN_PORT', price=420 EUR
+  4. article_nr='*', var_cond='PG_PIAGGIO_TABLE_TWO', price=620 EUR
+  5. article_nr='*', var_cond='PG_WHITEBOARD_EXTERIORS', price=1050 EUR
+
+--- OCD_PROPVALUE2VARCOND TABLE ---
+Table does NOT exist or is empty
+
+--- OCD_PROPERTYCLASS TABLE ---
+Total article property class mappings: 3
+Sample property class mappings (first 5):
+  1. article_nr='2Q_LOUNGE', classes=["MG_GLOBAL", "MG_PROPERTIES"]
+  2. article_nr='2Q_WITHOUT_FURNITURE', classes=["MG_GLOBAL", "MG_PROPERTIES"]
+  3. article_nr='2Q_HUDDLE', classes=["MG_GLOBAL", "MG_PROPERTIES"]
+
+--- OCD_ARTICLE TABLE ---
+Total articles: 3
+Sample articles (first 5):
+  1. article_nr='2Q_HUDDLE', manufacturer='FRAMERY', series='FRMR_2Q'
+  2. article_nr='2Q_LOUNGE', manufacturer='FRAMERY', series='FRMR_2Q'
+  3. article_nr='2Q_WITHOUT_FURNITURE', manufacturer='FRAMERY', series='FRMR_2Q'
+
+================================================================================
+ANALYZING: framery/frmr_q
+Path: /reference/ofmldata/framery/frmr_q/ANY/1/db/pdata.ebase
+================================================================================
+
+--- OCD_PRICE TABLE ---
+Total price records: 10
+Base prices (level B): 2
+Surcharges (level X): 7
+
+Base price var_cond patterns: {""}
+
+Sample base prices (first 5):
+  1. article_nr='Q_FLIP_FOLD', var_cond='', price=42070 EUR
+  2. article_nr='Q_FLOW', var_cond='', price=27990 EUR
+
+Surcharge var_cond samples (first 10): ["PG_EXTERIORS_ULTRA_MATT", "PG_MEETING_MAGGIE_OPTION_FABRIC", "PG_COPPER_HANDLE", "PG_WHITEBOARD", "PG_COLOR_FRAMES", "PG_EXTERIORS_BRUSHED_STAINLESS_STEEL", "PG_SMART_LOCK"]
+
+Sample surcharges (first 5):
+  1. article_nr='*', var_cond='PG_MEETING_MAGGIE_OPTION_FABRIC', price=585 EUR
+  2. article_nr='*', var_cond='PG_COLOR_FRAMES', price=1345 EUR
+  3. article_nr='*', var_cond='PG_EXTERIORS_ULTRA_MATT', price=825 EUR
+  4. article_nr='*', var_cond='PG_EXTERIORS_BRUSHED_STAINLESS_STEEL', price=1140 EUR
+  5. article_nr='*', var_cond='PG_WHITEBOARD', price=940 EUR
+
+--- OCD_PROPVALUE2VARCOND TABLE ---
+Table does NOT exist or is empty
+
+--- OCD_PROPERTYCLASS TABLE ---
+Total article property class mappings: 4
+Sample property class mappings (first 5):
+  1. article_nr='Q_MEETING_MAGGIE', classes=["MG_GLOBAL", "MG_PROPERTIES"]
+  2. article_nr='Q_MEETING_MAGGIE_PREMIUM', classes=["MG_GLOBAL", "MG_PROPERTIES"]
+  3. article_nr='Q_FLOW', classes=["MG_GLOBAL", "MG_PROPERTIES"]
+  4. article_nr='Q_FLIP_FOLD', classes=["MG_GLOBAL", "MG_PROPERTIES_FLIP_FOLD"]
+
+--- OCD_ARTICLE TABLE ---
+Total articles: 4
+Sample articles (first 5):
+  1. article_nr='Q_MEETING_MAGGIE', manufacturer='FRAMERY', series='FRMR_Q'
+  2. article_nr='Q_MEETING_MAGGIE_PREMIUM', manufacturer='FRAMERY', series='FRMR_Q'
+  3. article_nr='Q_FLOW', manufacturer='FRAMERY', series='FRMR_Q'
+  4. article_nr='Q_FLIP_FOLD', manufacturer='FRAMERY', series='FRMR_Q'
+
+================================================================================
+ANALYZING: fast/kr
+Path: /reference/ofmldata/fast/kr/DE/1/db/pdata.ebase
+================================================================================
+
+--- OCD_PRICE TABLE ---
+Total price records: 8
+Base prices (level B): 8
+Surcharges (level X): 0
+
+Base price var_cond patterns: {"SG-KR-KM-3ER-ES", "SG-KR-WKM-D80-ES", "SG-KR-KM-D54-ES", "SG-KR-KM-D34-ES", "SG-KR-WKM-3ER-ES", "SG-KR-WKM-D54-ES", "SG-KR-KM-D80-ES", "SG-KR-WKM-D34-ES"}
+
+Sample base prices (first 5):
+  1. article_nr='sG-Kr', var_cond='SG-KR-KM-3ER-ES', price=1343.6975 EUR
+  2. article_nr='sG-Kr', var_cond='SG-KR-KM-D34-ES', price=226.05042 EUR
+  3. article_nr='sG-Kr', var_cond='SG-KR-KM-D54-ES', price=385.7143 EUR
+  4. article_nr='sG-Kr', var_cond='SG-KR-KM-D80-ES', price=755.46216 EUR
+  5. article_nr='sG-Kr', var_cond='SG-KR-WKM-3ER-ES', price=881.51263 EUR
+
+Surcharge var_cond samples (first 10): []
+
+--- OCD_PROPVALUE2VARCOND TABLE ---
+Table does NOT exist or is empty
+
+--- OCD_PROPERTYCLASS TABLE ---
+Total article property class mappings: 1
+Sample property class mappings (first 5):
+  1. article_nr='sG-Kr', classes=["Rahmen"]
+
+--- OCD_ARTICLE TABLE ---
+Total articles: 1
+Sample articles (first 5):
+  1. article_nr='sG-Kr', manufacturer='FAST', series='KR'
+
+================================================================================
+ANALYZING: fast/wkm
+Path: /reference/ofmldata/fast/wkm/DE/1/db/pdata.ebase
+================================================================================
+
+--- OCD_PRICE TABLE ---
+Total price records: 21
+Base prices (level B): 21
+Surcharges (level X): 0
+
+Base price var_cond patterns: {"SG-MB-WKM-80X80-HOEI", "SG-MB-WKM-80X80-HOWE", "SG-MB-WKM-140X40-HOWE", "SG-MB-WKM-VL-140X40-HOEI", "SG-MB-WKM-VL-140X40-HOSW", "SG-MB-WKM-VL-80X80-HOEI", "SG-MB-WKM-VL-100X60-HOWE", "SG-MB-WKM-100X60-HOEI", "SG-MB-WKM-VL-80X80-HOSW", "SG-MB-WKM-VL-80X80-HOWE", "SG-MB-WKM-VL-100X60-HOEI", "SG-MB-WKM-VL-140X40-HOWE", "SG-MB-WKM-140X40-HOEI", "SG-MB-WKM-VL-100X60-HOSW", "SG-MB-WKM-140X40-HOSW", "SG-MB-WKM-100X60-HOSW", "SG-MB-WKM-55X55-HOWE", "SG-MB-WKM-35X35-HOWE", "SG-MB-WKM-80X80-HOSW", "SG-MB-WKM-100X60-HOWE", "SG-MB-WKM-57X27-HOWE"}
+
+Sample base prices (first 5):
+  1. article_nr='sG-WKm', var_cond='SG-MB-WKM-100X60-HOEI', price=394.11765 EUR
+  2. article_nr='sG-WKm', var_cond='SG-MB-WKM-100X60-HOSW', price=368.90756 EUR
+  3. article_nr='sG-WKm', var_cond='SG-MB-WKM-100X60-HOWE', price=368.90756 EUR
+  4. article_nr='sG-WKm', var_cond='SG-MB-WKM-140X40-HOEI', price=394.11765 EUR
+  5. article_nr='sG-WKm', var_cond='SG-MB-WKM-140X40-HOSW', price=360.5042 EUR
+
+Surcharge var_cond samples (first 10): []
+
+--- OCD_PROPVALUE2VARCOND TABLE ---
+Table does NOT exist or is empty
+
+--- OCD_PROPERTYCLASS TABLE ---
+Total article property class mappings: 1
+Sample property class mappings (first 5):
+  1. article_nr='sG-WKm', classes=["Rahmen"]
+
+--- OCD_ARTICLE TABLE ---
+Total articles: 1
+Sample articles (first 5):
+  1. article_nr='sG-WKm', manufacturer='FAST', series='WKM'
+
+================================================================================
+ANALYZING: sedus/ai
+Path: /reference/ofmldata/sex/ai/DE/1/db/pdata.ebase
+================================================================================
+
+--- OCD_PRICE TABLE ---
+Total price records: 60
+Base prices (level B): 8
+Surcharges (level X): 52
+
+Base price var_cond patterns: {"S_PGX"}
+
+Sample base prices (first 5):
+  1. article_nr='AI-121', var_cond='S_PGX', price=599 EUR
+  2. article_nr='AI-121', var_cond='S_PGX', price=599 EUR
+  3. article_nr='AI-121', var_cond='S_PGX', price=647 EUR
+  4. article_nr='AI-121', var_cond='S_PGX', price=616 EUR
+  5. article_nr='AI-821', var_cond='S_PGX', price=599 EUR
+
+Surcharge var_cond samples (first 10): ["S_168", "S_6004", "S_1513", "S_1801", "S_2415_F2", "S_6044", "S_167", "S_166"]
+
+Sample surcharges (first 5):
+  1. article_nr='AI-121', var_cond='S_1513', price=228 EUR
+  2. article_nr='AI-121', var_cond='S_1513', price=222 EUR
+  3. article_nr='AI-121', var_cond='S_1513', price=222 EUR
+  4. article_nr='AI-121', var_cond='S_1513', price=228 EUR
+  5. article_nr='AI-121', var_cond='S_166', price=44 EUR
+
+--- OCD_PROPVALUE2VARCOND TABLE ---
+Table does NOT exist or is empty
+
+--- OCD_PROPERTYCLASS TABLE ---
+Total article property class mappings: 2
+Sample property class mappings (first 5):
+  1. article_nr='AI-121', classes=["KLASSE_000000000000164057", "KLASSE_HMERK"]
+  2. article_nr='AI-821', classes=["KLASSE_000000000000164057", "KLASSE_HMERK"]
+
+--- OCD_ARTICLE TABLE ---
+Total articles: 2
+Sample articles (first 5):
+  1. article_nr='AI-121', manufacturer='SE', series='AI'
+  2. article_nr='AI-821', manufacturer='SE', series='AI'
+
+================================================================================
+ANALYZING: bisley/systemfile
+Path: /reference/ofmldata/bisley/systemfile/DE/1/db/pdata.ebase
+================================================================================
+
+ERROR analyzing bisley/systemfile: Database file does not exist: /reference/ofmldata/bisley/systemfile/DE/1/db/pdata.ebase
+
+========================================================================================================================
+PRICING PATTERNS COMPARISON TABLE
+========================================================================================================================
+Manufacturer    Series               Base Pattern                   Surch Pattern                  propvalue2varcond?  
+------------------------------------------------------------------------------------------------------------------------
+framery         frmr_one             NONE                           'PG_ADJUSTABLE_SEAT', 'PG_CARPET_OPTION_COLOR' NO                  
+framery         frmr_2q              ''                             'PG_LAN_PORT', 'PG_WHITEBOARD_EXTERIORS' NO                  
+framery         frmr_q               ''                             'PG_EXTERIORS_ULTRA_MATT', 'PG_MEETING_MAGGIE_OPTION_FABRIC' NO                  
+fast            kr                   'SG-KR-KM-3ER-ES', 'SG-KR-WKM-D80-ES', 'SG-KR-KM-D54-ES' NONE                           NO                  
+fast            wkm                  'SG-MB-WKM-80X80-HOEI', 'SG-MB-WKM-80X80-HOWE', 'SG-MB-WKM-140X40-HOWE' NONE                           NO                  
+sedus           ai                   'S_PGX'                        'S_168', 'S_6004'              NO                  
+
+========================================================================================================================
+KEY FINDINGS:
+========================================================================================================================
+
+1. BASE PRICE PATTERNS:
+   All unique base var_cond values across all manufacturers:
+     - 'SG-KR-WKM-D54-ES'
+     - 'SG-MB-WKM-VL-100X60-HOEI'
+     - 'SG-MB-WKM-VL-140X40-HOWE'
+     - 'SG-KR-WKM-D80-ES'
+     - 'SG-MB-WKM-100X60-HOSW'
+     - 'SG-MB-WKM-100X60-HOWE'
+     - 'SG-MB-WKM-35X35-HOWE'
+     - 'SG-MB-WKM-VL-140X40-HOEI'
+     - 'SG-KR-WKM-3ER-ES'
+     - 'SG-MB-WKM-55X55-HOWE'
+     - 'SG-KR-WKM-D34-ES'
+     - 'SG-MB-WKM-80X80-HOSW'
+     - 'SG-MB-WKM-VL-140X40-HOSW'
+     - 'SG-MB-WKM-80X80-HOEI'
+     - 'SG-MB-WKM-VL-100X60-HOWE'
+     - 'SG-MB-WKM-VL-80X80-HOSW'
+     - 'SG-KR-KM-D34-ES'
+     - 'SG-MB-WKM-140X40-HOWE'
+     - 'SG-MB-WKM-57X27-HOWE'
+     - 'SG-KR-KM-3ER-ES'
+     - 'SG-MB-WKM-100X60-HOEI'
+     - 'SG-MB-WKM-VL-80X80-HOWE'
+     - 'SG-KR-KM-D54-ES'
+     - 'SG-MB-WKM-140X40-HOSW'
+     - 'S_PGX'
+     - 'SG-MB-WKM-VL-100X60-HOSW'
+     - 'SG-MB-WKM-VL-80X80-HOEI'
+     - ''
+     - 'SG-MB-WKM-140X40-HOEI'
+     - 'SG-MB-WKM-80X80-HOWE'
+     - 'SG-KR-KM-D80-ES'
+
+2. PROPVALUE2VARCOND TABLE:
+   NO manufacturers have this table
+
+3. HIGHEST BASE PRICES (looking for Framery's thousands of EUR):
+   framery/frmr_2q: min=42070, max=44140 (from 2 base prices)
+   framery/frmr_q: min=27990, max=42070 (from 2 base prices)
+   fast/kr: min=184.03362, max=1343.6975 (from 8 base prices)
+   fast/wkm: min=100, max=402.521 (from 21 base prices)
+   sedus/ai: min=599, max=647 (from 8 base prices)
+
+4. DATA COMPLETENESS:
+   Manufacturer    Series               Articles     Base Prices  Surcharges   Prop Classes
+   ----------------------------------------------------------------------------------------
+   framery         frmr_one             3            0            9            3           
+   framery         frmr_2q              3            2            7            3           
+   framery         frmr_q               4            2            7            4           
+   fast            kr                   1            8            0            1           
+   fast            wkm                  1            21           0            1           
+   sedus           ai                   2            8            52           2           
