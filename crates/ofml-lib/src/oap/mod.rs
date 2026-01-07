@@ -11,8 +11,11 @@
 //! The module is designed to be reusable across CLI, TUI, and future WASM targets.
 
 pub mod actions;
+pub mod article_price;
 pub mod catalog;
 pub mod config;
+pub mod currency;
+pub mod discount;
 pub mod engine;
 pub mod families;
 pub mod manufacturers;
@@ -22,6 +25,7 @@ pub mod ocd_properties;
 pub mod ocd_relation;
 pub mod price;
 pub mod property;
+pub mod tax;
 pub mod variant;
 
 // Re-export Configuration for TUI module
@@ -32,6 +36,21 @@ pub use ocd::{DataWarning, PricingStrategy, WarningSeverity};
 
 // Re-export price types from price module
 pub use price::{Discount, PriceBreakdown, PriceError};
+
+// Re-export currency types
+pub use currency::{Currency, CurrencyConverter, CurrencyError, Money};
+
+// Re-export tax types
+pub use tax::{TaxCalculator, TaxCategory, TaxRate, TaxRegistry, TaxResult, TaxScheme, TaxType};
+
+// Re-export discount types
+pub use discount::{
+    AppliedDiscount, DiscountBuilder, DiscountEntry, DiscountManager, DiscountResult,
+    DiscountRule, DiscountType,
+};
+
+// Re-export article price types
+pub use article_price::{ArticlePrice, ArticlePriceBuilder, ArticleSurcharge};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
